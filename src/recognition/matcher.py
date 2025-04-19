@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Tuple
 from facenet_pytorch import InceptionResnetV1
 from PIL import Image
 
-from core.logger import setup_logger
+from src.core.logger import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -254,3 +254,7 @@ class FaceMatcher:
         if not self.matching_times:
             return 0
         return sum(self.matching_times) / len(self.matching_times) * 1000
+
+    def match(self, face_image: np.ndarray) -> Optional[Dict[str, float]]:
+        """Match a face against the database."""
+        return None

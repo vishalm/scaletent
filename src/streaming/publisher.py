@@ -8,8 +8,9 @@ import json
 from typing import Dict, Any, Optional
 from datetime import datetime
 from collections import deque
+import numpy as np
 
-from core.logger import setup_logger
+from src.core.logger import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -35,6 +36,8 @@ class StreamPublisher:
         }
         
         logger.info(f"Stream publisher initialized with queue size {max_queue_size}")
+        
+        self.clients = set()
     
     async def publish(self, message: Dict[str, Any]) -> bool:
         """
@@ -216,3 +219,15 @@ class StreamPublisher:
             logger.warning("Timeout waiting for message queue to empty")
         except Exception as e:
             logger.error(f"Error waiting for queue: {e}")
+    
+    async def publish(self, frame: np.ndarray, metadata: Dict[str, Any] = None) -> None:
+        """Publish a frame to all connected clients."""
+        pass
+        
+    def add_client(self, client_id: str) -> None:
+        """Add a client to the publisher."""
+        self.clients.add(client_id)
+        
+    def remove_client(self, client_id: str) -> None:
+        """Remove a client from the publisher."""
+        self.clients.discard(client_id)

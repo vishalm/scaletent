@@ -1,48 +1,48 @@
-FROM python:3.10-slim
+FROM python:3.10-slim-bullseye
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
+# Install system dependencies and SSL certificates
+RUN apt-get update && \
+    apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    ca-certificates \
     curl \
     git \
-    wget \
-    ca-certificates \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && update-ca-certificates
 
 # Create necessary directories
-RUN mkdir -p /app/data/models /app/data/db /app/logs /app/config /app/src
+RUN mkdir -p /app/src /app/data /app/config /app/logs /app/models
 
-# Download YOLOv8 model using wget
-RUN wget --no-check-certificate https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt -O /app/data/models/yolov8n.pt
-
-# Copy source code first
-COPY src/ /app/src/
-# Copy other files
-COPY config/ /app/config/
-COPY requirements.apple-silicon.txt /app/requirements.txt
+# Copy requirements first to leverage Docker cache
+COPY requirements.apple-silicon.txt /app/
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.apple-silicon.txt
 
 # Install PyTorch with MPS support
-RUN pip install --no-cache-dir torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir \
+    torch==2.1.0 \
+    torchvision==0.16.0 \
+    torchaudio==2.1.0
+
+# Copy source code and config
+COPY src/ /app/src/
+COPY config/ /app/config/
 
 # Set environment variables
-ENV PYTHONPATH=/app
-ENV DEVICE=mps
-ENV PYTORCH_ENABLE_MPS_FALLBACK=1
-# Add OpenCV environment variables
-ENV OPENCV_VIDEOIO_PRIORITY_MSMF=0
-ENV PYTHONUNBUFFERED=1
-ENV SSL_CERT_DIR=/etc/ssl/certs
+ENV PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1 \
+    DEVICE_TYPE=mps
+
+# Pre-download FaceNet model
+RUN python -c "from facenet_pytorch import InceptionResnetV1; InceptionResnetV1(pretrained='vggface2')"
 
 # Expose ports for API and UI
 EXPOSE 8000 8501
 
-# Command to run the application
-CMD ["python", "/app/src/main.py"] 
+# Set the command to run the application
+CMD ["python", "/app/src/main.py"]

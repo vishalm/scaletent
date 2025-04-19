@@ -11,7 +11,7 @@ import torch
 from typing import Dict, Any, Optional, List, Tuple
 from pathlib import Path
 
-from core.logger import setup_logger
+from src.core.logger import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -694,3 +694,21 @@ class FaceEmbedder:
         similarity = max(0.0, min(1.0, similarity))
         
         return similarity
+
+    @staticmethod
+    def validate_input(tensor: torch.Tensor) -> None:
+        """
+        Validate input tensor dimensions.
+        
+        Args:
+            tensor (torch.Tensor): Input tensor to validate
+            
+        Raises:
+            ValueError: If tensor dimensions are invalid
+        """
+        if tensor.dim() != 4:
+            raise ValueError("Input must be a 4D tensor (batch, channels, height, width)")
+        if tensor.size(1) != 3:
+            raise ValueError("Input must have 3 channels")
+        if tensor.size(2) < 112 or tensor.size(3) < 112:
+            raise ValueError("Input spatial dimensions must be at least 112x112")

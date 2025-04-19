@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 import threading
+from typing import Optional
 
 # Global variables
 DEFAULT_LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -21,75 +22,18 @@ DEFAULT_BACKUP_COUNT = 5
 _logger_cache = threading.local()
 
 
-def setup_logger(name, level=None, log_dir=None, log_format=None, 
-                 console=True, file=True, max_size=None, backup_count=None):
-    """
-    Configure and return a logger
+def setup_logger(name: Optional[str] = None) -> logging.Logger:
+    """Set up and return a logger instance."""
+    logger = logging.getLogger(name or __name__)
     
-    Args:
-        name (str): Logger name
-        level (int, optional): Logging level
-        log_dir (str, optional): Log directory
-        log_format (str, optional): Log format
-        console (bool): Whether to log to console
-        file (bool): Whether to log to file
-        max_size (int, optional): Maximum log file size
-        backup_count (int, optional): Number of backup files
-    
-    Returns:
-        logging.Logger: Configured logger
-    """
-    # Use cache if available
-    if hasattr(_logger_cache, 'loggers') and name in _logger_cache.loggers:
-        return _logger_cache.loggers[name]
-    
-    # Create cache if it doesn't exist
-    if not hasattr(_logger_cache, 'loggers'):
-        _logger_cache.loggers = {}
-    
-    # Set defaults
-    level = level or DEFAULT_LOG_LEVEL
-    log_dir = log_dir or DEFAULT_LOG_DIR
-    log_format = log_format or DEFAULT_LOG_FORMAT
-    max_size = max_size or DEFAULT_MAX_LOG_SIZE
-    backup_count = backup_count or DEFAULT_BACKUP_COUNT
-    
-    # Create formatter
-    formatter = logging.Formatter(log_format)
-    
-    # Create logger
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    
-    # Remove existing handlers if any
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
-    
-    # Add console handler if enabled
-    if console:
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
-    
-    # Add file handler if enabled
-    if file:
-        # Create log directory if it doesn't exist
-        os.makedirs(log_dir, exist_ok=True)
-        
-        # Determine log file path
-        log_file = Path(log_dir) / f"{name.replace('.', '_')}.log"
-        
-        # Create rotating file handler
-        file_handler = RotatingFileHandler(
-            str(log_file),
-            maxBytes=max_size,
-            backupCount=backup_count
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
-    
-    # Add logger to cache
-    _logger_cache.loggers[name] = logger
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
     
     return logger
 

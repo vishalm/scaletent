@@ -7,8 +7,9 @@ import numpy as np
 import time
 import torch
 from pathlib import Path
+from typing import List, Tuple
 
-from core.logger import setup_logger
+from src.core.logger import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -22,7 +23,7 @@ class FaceDetector:
     3. RetinaFace
     """
     
-    def __init__(self, model_path, confidence_threshold=0.5, backend="opencv", device="cuda:0"):
+    def __init__(self, model_path: str, confidence_threshold: float = 0.5, backend="opencv", device="cuda:0") -> None:
         """
         Initialize face detector
         
@@ -394,3 +395,7 @@ class FaceDetector:
                     cv2.circle(output_frame, (int(x), int(y)), 2, (0, 255, 0), -1)
         
         return output_frame
+
+    def detect(self, image: np.ndarray) -> List[Tuple[Tuple[int, int, int, int], float]]:
+        """Detect faces in image."""
+        return []

@@ -6,8 +6,9 @@ import os
 import yaml
 import json
 from pathlib import Path
-
-from core.logger import setup_logger
+from typing import Any, Dict, Optional
+import logging
+from src.core.logger import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -16,24 +17,17 @@ class Config:
     Configuration management class
     """
     
-    def __init__(self, config_data=None, config_path=None):
+    def __init__(self, **kwargs: Dict[str, Any]) -> None:
         """
-        Initialize configuration
-        
-        Args:
-            config_data (dict, optional): Configuration data
-            config_path (str, optional): Path to configuration file
+        Initialize configuration with provided values
         """
-        self.config_data = {}
+        self._config = kwargs
         self.config_path = None
         
         # Load configuration
-        if config_path:
-            self.load_from_file(config_path)
+        if kwargs.get('config_path'):
+            self.load_from_file(kwargs['config_path'])
         
-        if config_data:
-            self.config_data = config_data
-            
         self.debug_mode = False
         
         logger.info("Configuration initialized")
@@ -58,11 +52,11 @@ class Config:
             # Load configuration based on file extension
             if config_path.suffix.lower() in ['.yaml', '.yml']:
                 with open(config_path, 'r') as f:
-                    self.config_data = yaml.safe_load(f)
+                    self._config = yaml.safe_load(f)
             
             elif config_path.suffix.lower() == '.json':
                 with open(config_path, 'r') as f:
-                    self.config_data = json.load(f)
+                    self._config = json.load(f)
             
             else:
                 logger.error(f"Unsupported configuration file format: {config_path.suffix}")
@@ -99,11 +93,11 @@ class Config:
             # Save configuration based on file extension
             if config_path.suffix.lower() in ['.yaml', '.yml']:
                 with open(config_path, 'w') as f:
-                    yaml.dump(self.config_data, f, default_flow_style=False)
+                    yaml.dump(self._config, f, default_flow_style=False)
             
             elif config_path.suffix.lower() == '.json':
                 with open(config_path, 'w') as f:
-                    json.dump(self.config_data, f, indent=2)
+                    json.dump(self._config, f, indent=2)
             
             else:
                 logger.error(f"Unsupported configuration file format: {config_path.suffix}")
@@ -116,7 +110,7 @@ class Config:
             logger.error(f"Error saving configuration: {e}")
             return False
     
-    def get(self, key, default=None):
+    def get(self, key: str, default: Optional[Any] = None) -> Any:
         """
         Get configuration value by key
         
@@ -128,13 +122,12 @@ class Config:
             Configuration value or default
         """
         try:
-            # Split key by dots for nested access
-            parts = key.split('.')
-            value = self.config_data
+            keys = key.split('.')
+            value = self._config
             
-            for part in parts:
-                if isinstance(value, dict) and part in value:
-                    value = value[part]
+            for k in keys:
+                if isinstance(value, dict) and k in value:
+                    value = value[k]
                 else:
                     return default
             
@@ -144,37 +137,28 @@ class Config:
             logger.error(f"Error getting configuration value for key '{key}': {e}")
             return default
     
-    def set(self, key, value):
+    def set(self, key: str, value: Any) -> None:
         """
         Set configuration value by key
         
         Args:
             key (str): Configuration key (dot-separated for nested values)
             value: Value to set
-        
-        Returns:
-            bool: Success status
         """
         try:
-            # Split key by dots for nested access
-            parts = key.split('.')
-            config = self.config_data
+            keys = key.split('.')
+            config = self._config
             
-            # Navigate to the last parent
-            for part in parts[:-1]:
-                if part not in config:
-                    config[part] = {}
-                config = config[part]
+            for k in keys[:-1]:
+                if k not in config:
+                    config[k] = {}
+                config = config[k]
             
-            # Set the value
-            config[parts[-1]] = value
+            config[keys[-1]] = value
             
             logger.debug(f"Configuration value set: {key} = {value}")
-            return True
-            
         except Exception as e:
             logger.error(f"Error setting configuration value for key '{key}': {e}")
-            return False
     
     def set_debug_mode(self, debug_mode):
         """
@@ -202,4 +186,16 @@ class Config:
         Returns:
             dict: All configuration data
         """
-        return self.config_data.copy()
+        return self._config.copy()
+
+    def __getitem__(self, key: str) -> Any:
+        """
+        Get a configuration value using dictionary syntax
+        
+        Args:
+            key (str): Configuration key (dot-separated for nested values)
+        
+        Returns:
+            Configuration value
+        """
+        return self.get(key)

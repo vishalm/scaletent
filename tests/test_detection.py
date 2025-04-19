@@ -3,6 +3,7 @@ import torch
 import numpy as np
 from unittest.mock import Mock, patch
 import platform
+from src.detection.detector import YOLODetector
 
 # Skip tests if not on Apple Silicon
 requires_apple_silicon = pytest.mark.skipif(
@@ -105,7 +106,9 @@ def test_error_handling():
     
     # Test invalid input
     with pytest.raises((ValueError, RuntimeError)):
-        torch.tensor([1.0]).to(torch.device("mps" if torch.backends.mps.is_available() else "cpu"))._torch_view()
+        # Try to perform an invalid operation that should raise an error
+        invalid_tensor = torch.tensor([1.0]).to(torch.device("mps" if torch.backends.mps.is_available() else "cpu"))
+        invalid_tensor.view(-1, -1)  # This should raise an error as dimensions are invalid
 
 @requires_apple_silicon
 def test_memory_management():
@@ -127,3 +130,32 @@ def test_memory_management():
         assert new_tensor is not None, "Failed to allocate new tensor after cleanup"
     except RuntimeError as e:
         pytest.fail(f"Memory management test failed: {e}")
+
+def test_detector_initialization(detector: YOLODetector):
+    """Test that the detector can be initialized."""
+    assert detector is not None
+    assert isinstance(detector, YOLODetector)
+
+def test_detector_inference(detector: YOLODetector, test_image: np.ndarray):
+    """Test that the detector can process an image."""
+    results = detector.detect(test_image)
+    assert isinstance(results, list)
+
+@pytest.mark.integration
+def test_detector_with_real_image(detector: YOLODetector):
+    """Test detector with a real image (integration test)."""
+    # This is just a placeholder for demonstration
+    test_image = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+    results = detector.detect(test_image)
+    assert isinstance(results, list)
+
+@pytest.mark.slow
+def test_detector_batch_processing(detector: YOLODetector):
+    """Test batch processing capabilities (marked as slow)."""
+    batch_size = 4
+    test_batch = [
+        np.zeros((480, 640, 3), dtype=np.uint8)
+        for _ in range(batch_size)
+    ]
+    results = [detector.detect(img) for img in test_batch]
+    assert len(results) == batch_size

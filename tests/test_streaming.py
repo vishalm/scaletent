@@ -48,18 +48,14 @@ def mock_websocket_server():
 @pytest.mark.asyncio
 async def test_websocket_connection():
     """Test WebSocket connection and basic communication."""
-    async def handler(websocket, path):
+    async def handler(websocket):
         await websocket.send(json.dumps({"status": "connected"}))
     
-    server = await websockets.serve(handler, "localhost", 8765)
-    try:
+    async with websockets.serve(handler, "localhost", 8765) as server:
         async with websockets.connect("ws://localhost:8765") as websocket:
             response = await websocket.recv()
             data = json.loads(response)
             assert data["status"] == "connected"
-    finally:
-        server.close()
-        await server.wait_closed()
 
 @pytest.mark.asyncio
 async def test_stream_data_format(mock_stream_data):
@@ -129,29 +125,27 @@ async def test_multiple_clients():
     """Test handling multiple client connections."""
     connected_clients = set()
     
-    async def handler(websocket, path):
+    async def handler(websocket):
         connected_clients.add(websocket)
         try:
             await websocket.wait_closed()
         finally:
             connected_clients.remove(websocket)
     
-    server = await websockets.serve(handler, "localhost", 8765)
-    try:
+    async with websockets.serve(handler, "localhost", 8766) as server:
         # Connect multiple clients
         clients = []
         for _ in range(3):
-            client = await websockets.connect("ws://localhost:8765")
+            client = await websockets.connect("ws://localhost:8766")
             clients.append(client)
         
+        # Give the server a moment to process connections
+        await asyncio.sleep(0.1)
         assert len(connected_clients) == 3, "Failed to handle multiple clients"
         
-        # Cleanup
+        # Clean up
         for client in clients:
             await client.close()
-    finally:
-        server.close()
-        await server.wait_closed()
 
 @pytest.mark.asyncio
 async def test_error_handling_stream():
@@ -160,11 +154,12 @@ async def test_error_handling_stream():
     with pytest.raises(websockets.exceptions.InvalidURI):
         async with websockets.connect("invalid_url"):
             pass
-    
-    # Test connection timeout
-    with pytest.raises(asyncio.TimeoutError):
-        async with websockets.connect("ws://non-existent-server:8765", timeout=1):
+
+    # Test connection refused
+    with pytest.raises(OSError) as exc_info:
+        async with websockets.connect("ws://localhost:9999"):
             pass
+    assert "Connect call failed" in str(exc_info.value)
 
 @pytest.mark.asyncio
 async def test_stream_reconnection():
@@ -172,23 +167,24 @@ async def test_stream_reconnection():
     connection_attempts = 0
     max_attempts = 3
     
-    async def attempt_connection():
+    async def mock_connect():
         nonlocal connection_attempts
         connection_attempts += 1
         if connection_attempts < max_attempts:
-            raise websockets.exceptions.ConnectionClosed(1006, "Connection lost")
+            raise ConnectionRefusedError("Connection refused")
         return True
     
     # Simulate reconnection attempts
-    try:
-        result = await attempt_connection()
-        while not result and connection_attempts < max_attempts:
+    for _ in range(max_attempts):
+        try:
+            result = await mock_connect()
+            if result:
+                break
+        except ConnectionRefusedError:
             await asyncio.sleep(0.1)
-            result = await attempt_connection()
-        
-        assert result, "Failed to reconnect after multiple attempts"
-    except Exception as e:
-        pytest.fail(f"Reconnection test failed: {e}")
+            continue
+    
+    assert connection_attempts == max_attempts, "Did not attempt all reconnections"
 
 @pytest.mark.asyncio
 async def test_stream_data_validation(mock_stream_data):

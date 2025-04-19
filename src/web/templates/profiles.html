@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .profile-image {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+    .profile-card {
+        transition: transform 0.2s;
+    }
+    .profile-card:hover {
+        transform: translateY(-5px);
+    }
+    .profile-preview {
+        width: 200px;
+        height: 200px;
+        border-radius: 8px;
+        object-fit: cover;
+        margin-bottom: 1rem;
+    }
+    .drag-drop-zone {
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        padding: 2rem;
+        text-align: center;
+        cursor: pointer;
+        transition: border-color 0.2s;
+    }
+    .drag-drop-zone:hover,
+    .drag-drop-zone.dragover {
+        border-color: #0d6efd;
+    }
+    .profile-search {
+        max-width: 300px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="h3 mb-0">Profile Management</h1>
+            <div class="d-flex gap-2 align-items-center">
+                <div class="profile-search">
+                    <input type="text" class="form-control" id="profileSearch" placeholder="Search profiles...">
+                </div>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProfileModal">
+                    <i class="fas fa-user-plus me-2"></i>Add Profile
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Profile Grid -->
+<div class="row g-4" id="profileGrid">
+    <!-- Profiles will be dynamically added here -->
+</div>
+
+<!-- Add Profile Modal -->
+<div class="modal fade" id="addProfileModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Profile</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addProfileForm">
+                    <div class="mb-4 text-center">
+                        <img src="/static/img/profile-placeholder.png" class="profile-preview" id="profilePreview">
+                        <div class="drag-drop-zone" id="dragDropZone">
+                            <i class="fas fa-cloud-upload-alt fa-2x mb-2"></i>
+                            <p class="mb-0">Drag & drop an image or click to select</p>
+                            <input type="file" class="d-none" id="profileImage" accept="image/*" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">ID *</label>
+                        <input type="text" class="form-control" name="id" required>
+                        <div class="form-text">A unique identifier for this person</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name *</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Role</label>
+                        <input type="text" class="form-control" name="role">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Organization</label>
+                        <input type="text" class="form-control" name="organization">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Additional Information</label>
+                        <textarea class="form-control" name="additional_info" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="addProfileBtn">Add Profile</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Profile Modal -->
+<div class="modal fade" id="editProfileModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Profile</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editProfileForm">
+                    <input type="hidden" name="id">
+                    <div class="mb-4 text-center">
+                        <img src="/static/img/profile-placeholder.png" class="profile-preview" id="editProfilePreview">
+                        <div class="drag-drop-zone" id="editDragDropZone">
+                            <i class="fas fa-cloud-upload-alt fa-2x mb-2"></i>
+                            <p class="mb-0">Drag & drop to update image</p>
+                            <input type="file" class="d-none" id="editProfileImage" accept="image/*">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-control" name="name">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Role</label>
+                        <input type="text" class="form-control" name="role">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Organization</label>
+                        <input type="text" class="form-control" name="organization">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Additional Information</label>
+                        <textarea class="form-control" name="additional_info" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger me-auto" id="deleteProfileBtn">Delete Profile</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveProfileBtn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Setup drag and drop for profile image
+    function setupDragDrop(dragZone, fileInput, previewImg) {
+        dragZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dragZone.classList.add('dragover');
+        });
+        
+        dragZone.addEventListener('dragleave', () => {
+            dragZone.classList.remove('dragover');
+        });
+        
+        dragZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragZone.classList.remove('dragover');
+            
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                fileInput.files = e.dataTransfer.files;
+                previewImage(file, previewImg);
+            }
+        });
+        
+        dragZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        fileInput.addEventListener('change', () => {
+            const file = fileInput.files[0];
+            if (file) {
+                previewImage(file, previewImg);
+            }
+        });
+    }
+    
+    // Preview selected image
+    function previewImage(file, previewImg) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            previewImg.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+    
+    // Setup drag and drop zones
+    setupDragDrop(
+        document.getElementById('dragDropZone'),
+        document.getElementById('profileImage'),
+        document.getElementById('profilePreview')
+    );
+    
+    setupDragDrop(
+        document.getElementById('editDragDropZone'),
+        document.getElementById('editProfileImage'),
+        document.getElementById('editProfilePreview')
+    );
+    
+    // Function to update profile grid
+    async function updateProfileGrid(searchTerm = '') {
+        try {
+            const response = await fetch('/api/identities');
+            const profiles = await response.json();
+            
+            const profileGrid = document.getElementById('profileGrid');
+            profileGrid.innerHTML = ''; // Clear existing profiles
+            
+            // Filter profiles if search term exists
+            const filteredProfiles = searchTerm
+                ? profiles.filter(p => 
+                    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    p.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    p.role?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    p.organization?.toLowerCase().includes(searchTerm.toLowerCase())
+                )
+                : profiles;
+            
+            // Add profile cards
+            filteredProfiles.forEach(profile => {
+                const col = document.createElement('div');
+                col.className = 'col-md-6 col-lg-4 col-xl-3';
+                col.innerHTML = `
+                    <div class="card profile-card h-100 border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-3">
+                                <img src="/api/identities/${profile.id}/image" 
+                                     class="profile-image me-3"
+                                     onerror="this.src='/static/img/profile-placeholder.png'">
+                                <div>
+                                    <h6 class="mb-0">${profile.name || 'Unnamed'}</h6>
+                                    <small class="text-muted">${profile.role || 'No role'}</small>
+                                </div>
+                            </div>
+                            <p class="mb-0 text-muted">
+                                <i class="fas fa-building me-2"></i>${profile.organization || 'No organization'}
+                            </p>
+                            <p class="mb-0 text-muted">
+                                <i class="fas fa-fingerprint me-2"></i>${profile.id}
+                            </p>
+                        </div>
+                        <div class="card-footer bg-transparent border-0">
+                            <button class="btn btn-sm btn-primary w-100 edit-profile-btn" 
+                                    data-profile-id="${profile.id}">
+                                <i class="fas fa-edit me-2"></i>Edit Profile
+                            </button>
+                        </div>
+                    </div>
+                `;
+                profileGrid.appendChild(col);
+            });
+            
+            // Add event listeners to edit buttons
+            setupProfileControls();
+            
+        } catch (error) {
+            console.error('Error updating profile grid:', error);
+        }
+    }
+    
+    // Setup profile controls
+    function setupProfileControls() {
+        document.querySelectorAll('.edit-profile-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const profileId = e.currentTarget.dataset.profileId;
+                openEditProfile(profileId);
+            });
+        });
+    }
+    
+    // Handle profile search
+    const searchInput = document.getElementById('profileSearch');
+    let searchTimeout;
+    
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            updateProfileGrid(e.target.value);
+        }, 300);
+    });
+    
+    // Handle adding new profile
+    document.getElementById('addProfileBtn').addEventListener('click', async () => {
+        const form = document.getElementById('addProfileForm');
+        const formData = new FormData(form);
+        const imageFile = document.getElementById('profileImage').files[0];
+        
+        if (imageFile) {
+            formData.append('image', imageFile);
+        }
+        
+        try {
+            const response = await fetch('/api/register', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.ok) {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addProfileModal'));
+                modal.hide();
+                form.reset();
+                document.getElementById('profilePreview').src = '/static/img/profile-placeholder.png';
+                updateProfileGrid();
+            }
+        } catch (error) {
+            console.error('Error adding profile:', error);
+        }
+    });
+    
+    // Function to open edit profile
+    async function openEditProfile(profileId) {
+        try {
+            const response = await fetch(`/api/identities/${profileId}`);
+            const profile = await response.json();
+            
+            const form = document.getElementById('editProfileForm');
+            form.elements.id.value = profileId;
+            form.elements.name.value = profile.name || '';
+            form.elements.role.value = profile.role || '';
+            form.elements.organization.value = profile.organization || '';
+            form.elements.additional_info.value = JSON.stringify(profile.additional_info || {}, null, 2);
+            
+            document.getElementById('editProfilePreview').src = `/api/identities/${profileId}/image`;
+            
+            const modal = new bootstrap.Modal(document.getElementById('editProfileModal'));
+            modal.show();
+        } catch (error) {
+            console.error('Error loading profile:', error);
+        }
+    }
+    
+    // Handle saving profile changes
+    document.getElementById('saveProfileBtn').addEventListener('click', async () => {
+        const form = document.getElementById('editProfileForm');
+        const formData = new FormData(form);
+        const profileId = formData.get('id');
+        const imageFile = document.getElementById('editProfileImage').files[0];
+        
+        if (imageFile) {
+            formData.append('image', imageFile);
+        }
+        
+        try {
+            const response = await fetch(`/api/identities/${profileId}`, {
+                method: 'PUT',
+                body: formData
+            });
+            
+            if (response.ok) {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('editProfileModal'));
+                modal.hide();
+                updateProfileGrid();
+            }
+        } catch (error) {
+            console.error('Error updating profile:', error);
+        }
+    });
+    
+    // Handle deleting profile
+    document.getElementById('deleteProfileBtn').addEventListener('click', async () => {
+        const form = document.getElementById('editProfileForm');
+        const profileId = form.elements.id.value;
+        
+        if (confirm(`Are you sure you want to delete profile ${profileId}?`)) {
+            try {
+                const response = await fetch(`/api/identities/${profileId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('editProfileModal'));
+                    modal.hide();
+                    updateProfileGrid();
+                }
+            } catch (error) {
+                console.error('Error deleting profile:', error);
+            }
+        }
+    });
+    
+    // Initial update
+    updateProfileGrid();
+});
+</script>
+{% endblock %} 

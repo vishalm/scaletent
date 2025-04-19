@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .settings-section {
+        margin-bottom: 2rem;
+    }
+    .settings-card {
+        height: 100%;
+    }
+    .form-switch {
+        padding-left: 2.5rem;
+    }
+    .form-switch .form-check-input {
+        width: 3rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="h3 mb-0">System Settings</h1>
+            <button class="btn btn-primary" id="saveSettingsBtn">
+                <i class="fas fa-save me-2"></i>Save Changes
+            </button>
+        </div>
+    </div>
+</div>
+
+<form id="settingsForm">
+    <!-- Detection Settings -->
+    <div class="settings-section">
+        <h5 class="mb-4">Detection Settings</h5>
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm settings-card">
+                    <div class="card-body">
+                        <h6 class="card-title mb-4">Face Detection</h6>
+                        <div class="mb-3">
+                            <label class="form-label">Confidence Threshold</label>
+                            <input type="range" class="form-range" name="detection.confidence_threshold" 
+                                   min="0" max="1" step="0.05" value="0.5">
+                            <div class="d-flex justify-content-between">
+                                <small class="text-muted">Low (0.0)</small>
+                                <small class="text-muted">High (1.0)</small>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="detection.enabled" checked>
+                                <label class="form-check-label">Enable Face Detection</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm settings-card">
+                    <div class="card-body">
+                        <h6 class="card-title mb-4">Recognition Settings</h6>
+                        <div class="mb-3">
+                            <label class="form-label">Similarity Threshold</label>
+                            <input type="range" class="form-range" name="recognition.similarity_threshold" 
+                                   min="0" max="1" step="0.05" value="0.7">
+                            <div class="d-flex justify-content-between">
+                                <small class="text-muted">Low (0.0)</small>
+                                <small class="text-muted">High (1.0)</small>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="recognition.enabled" checked>
+                                <label class="form-check-label">Enable Face Recognition</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- System Settings -->
+    <div class="settings-section">
+        <h5 class="mb-4">System Settings</h5>
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm settings-card">
+                    <div class="card-body">
+                        <h6 class="card-title mb-4">Performance</h6>
+                        <div class="mb-3">
+                            <label class="form-label">Processing Threads</label>
+                            <input type="number" class="form-control" name="system.processing_threads" 
+                                   min="1" max="16" value="4">
+                            <div class="form-text">Number of threads for parallel processing</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Frame Buffer Size</label>
+                            <input type="number" class="form-control" name="system.frame_buffer_size" 
+                                   min="1" max="100" value="30">
+                            <div class="form-text">Maximum frames to buffer for processing</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm settings-card">
+                    <div class="card-body">
+                        <h6 class="card-title mb-4">Storage</h6>
+                        <div class="mb-3">
+                            <label class="form-label">Data Retention (days)</label>
+                            <input type="number" class="form-control" name="storage.data_retention_days" 
+                                   min="1" max="365" value="30">
+                            <div class="form-text">Days to keep detection data</div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="storage.auto_cleanup" checked>
+                                <label class="form-check-label">Enable Automatic Cleanup</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- API Settings -->
+    <div class="settings-section">
+        <h5 class="mb-4">API Settings</h5>
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm settings-card">
+                    <div class="card-body">
+                        <h6 class="card-title mb-4">Security</h6>
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="api.security.enabled">
+                                <label class="form-check-label">Enable API Key Authentication</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">API Key</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="api.security.api_key" readonly>
+                                <button class="btn btn-outline-secondary" type="button" id="generateApiKeyBtn">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                            <div class="form-text">Used for authenticating API requests</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm settings-card">
+                    <div class="card-body">
+                        <h6 class="card-title mb-4">Rate Limiting</h6>
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="api.rate_limit.enabled">
+                                <label class="form-check-label">Enable Rate Limiting</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Requests per Minute</label>
+                            <input type="number" class="form-control" name="api.rate_limit.rpm" 
+                                   min="1" max="1000" value="60">
+                            <div class="form-text">Maximum API requests per minute per client</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<!-- Backup Modal -->
+<div class="modal fade" id="backupModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Backup Settings</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Download a backup of your current system settings.</p>
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="includeProfiles">
+                        <label class="form-check-label">Include Profile Data</label>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="includeHistory">
+                        <label class="form-check-label">Include Detection History</label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="downloadBackupBtn">Download Backup</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load current settings
+    async function loadSettings() {
+        try {
+            const response = await fetch('/api/config');
+            const settings = await response.json();
+            
+            const form = document.getElementById('settingsForm');
+            
+            // Update form values
+            Object.entries(settings).forEach(([key, value]) => {
+                if (typeof value === 'object') {
+                    Object.entries(value).forEach(([subKey, subValue]) => {
+                        const input = form.elements[`${key}.${subKey}`];
+                        if (input) {
+                            if (input.type === 'checkbox') {
+                                input.checked = subValue;
+                            } else {
+                                input.value = subValue;
+                            }
+                        }
+                    });
+                } else {
+                    const input = form.elements[key];
+                    if (input) {
+                        if (input.type === 'checkbox') {
+                            input.checked = value;
+                        } else {
+                            input.value = value;
+                        }
+                    }
+                }
+            });
+            
+        } catch (error) {
+            console.error('Error loading settings:', error);
+        }
+    }
+    
+    // Save settings
+    document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
+        try {
+            const form = document.getElementById('settingsForm');
+            const formData = new FormData(form);
+            
+            // Convert form data to nested object
+            const settings = {};
+            for (const [key, value] of formData.entries()) {
+                const keys = key.split('.');
+                let current = settings;
+                
+                for (let i = 0; i < keys.length - 1; i++) {
+                    if (!(keys[i] in current)) {
+                        current[keys[i]] = {};
+                    }
+                    current = current[keys[i]];
+                }
+                
+                const input = form.elements[key];
+                if (input.type === 'checkbox') {
+                    current[keys[keys.length - 1]] = input.checked;
+                } else if (input.type === 'number') {
+                    current[keys[keys.length - 1]] = Number(value);
+                } else if (input.type === 'range') {
+                    current[keys[keys.length - 1]] = Number(value);
+                } else {
+                    current[keys[keys.length - 1]] = value;
+                }
+            }
+            
+            const response = await fetch('/api/config', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(settings)
+            });
+            
+            if (response.ok) {
+                // Show success message
+                const toast = new bootstrap.Toast(document.createElement('div'));
+                toast.show();
+            }
+            
+        } catch (error) {
+            console.error('Error saving settings:', error);
+        }
+    });
+    
+    // Generate new API key
+    document.getElementById('generateApiKeyBtn').addEventListener('click', async () => {
+        try {
+            const response = await fetch('/api/config/generate-key', {
+                method: 'POST'
+            });
+            
+            if (response.ok) {
+                const { api_key } = await response.json();
+                document.querySelector('input[name="api.security.api_key"]').value = api_key;
+            }
+        } catch (error) {
+            console.error('Error generating API key:', error);
+        }
+    });
+    
+    // Download backup
+    document.getElementById('downloadBackupBtn').addEventListener('click', async () => {
+        try {
+            const includeProfiles = document.getElementById('includeProfiles').checked;
+            const includeHistory = document.getElementById('includeHistory').checked;
+            
+            const response = await fetch('/api/config/backup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    include_profiles: includeProfiles,
+                    include_history: includeHistory
+                })
+            });
+            
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `scaletent-backup-${new Date().toISOString().split('T')[0]}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                const modal = bootstrap.Modal.getInstance(document.getElementById('backupModal'));
+                modal.hide();
+            }
+        } catch (error) {
+            console.error('Error downloading backup:', error);
+        }
+    });
+    
+    // Initial load
+    loadSettings();
+});
+</script>
+{% endblock %} 

@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .camera-feed {
+        aspect-ratio: 16/9;
+        background: #000;
+        border-radius: 8px;
+        overflow: hidden;
+        position: relative;
+    }
+    .camera-feed img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .camera-controls {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 1rem;
+        background: linear-gradient(transparent, rgba(0,0,0,0.8));
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+    .camera-feed:hover .camera-controls {
+        opacity: 1;
+    }
+    .camera-status {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 1rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+    .camera-status.online {
+        background: rgba(25, 135, 84, 0.9);
+        color: white;
+    }
+    .camera-status.offline {
+        background: rgba(220, 53, 69, 0.9);
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="h3 mb-0">Camera Management</h1>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCameraModal">
+                <i class="fas fa-plus me-2"></i>Add Camera
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Camera Grid -->
+<div class="row g-4" id="camera-grid">
+    <!-- Camera feeds will be dynamically added here -->
+</div>
+
+<!-- Add Camera Modal -->
+<div class="modal fade" id="addCameraModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Camera</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addCameraForm">
+                    <div class="mb-3">
+                        <label class="form-label">Camera ID</label>
+                        <input type="text" class="form-control" name="camera_id" required>
+                        <div class="form-text">A unique identifier for the camera</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Camera Name</label>
+                        <input type="text" class="form-control" name="name">
+                        <div class="form-text">A friendly name for the camera</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Source URL</label>
+                        <input type="text" class="form-control" name="source" required>
+                        <div class="form-text">RTSP, HTTP, or device path (e.g., /dev/video0)</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Resolution</label>
+                        <div class="row">
+                            <div class="col">
+                                <input type="number" class="form-control" name="width" placeholder="Width" required>
+                            </div>
+                            <div class="col">
+                                <input type="number" class="form-control" name="height" placeholder="Height" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">FPS</label>
+                        <input type="number" class="form-control" name="fps" value="30" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="addCameraBtn">Add Camera</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Camera Settings Modal -->
+<div class="modal fade" id="cameraSettingsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Camera Settings</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="cameraSettingsForm">
+                    <input type="hidden" name="camera_id">
+                    <div class="mb-3">
+                        <label class="form-label">Camera Name</label>
+                        <input type="text" class="form-control" name="name">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Source URL</label>
+                        <input type="text" class="form-control" name="source">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Resolution</label>
+                        <div class="row">
+                            <div class="col">
+                                <input type="number" class="form-control" name="width" placeholder="Width">
+                            </div>
+                            <div class="col">
+                                <input type="number" class="form-control" name="height" placeholder="Height">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">FPS</label>
+                        <input type="number" class="form-control" name="fps">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger me-auto" id="deleteCameraBtn">Delete Camera</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveCameraBtn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Function to update camera grid
+    async function updateCameraGrid() {
+        try {
+            const response = await fetch('/api/cameras');
+            const data = await response.json();
+            
+            const cameraGrid = document.getElementById('camera-grid');
+            cameraGrid.innerHTML = ''; // Clear existing feeds
+            
+            // Add camera feeds
+            Object.entries(data.cameras || {}).forEach(([id, camera]) => {
+                const col = document.createElement('div');
+                col.className = 'col-lg-6 col-xl-4';
+                col.innerHTML = `
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body p-0">
+                            <div class="camera-feed">
+                                <img src="/api/cameras/${id}/snapshot" alt="Camera ${id}"
+                                     onerror="this.src='/static/img/offline.png'">
+                                <div class="camera-status ${camera.running ? 'online' : 'offline'}">
+                                    ${camera.running ? 'Online' : 'Offline'}
+                                </div>
+                                <div class="camera-controls">
+                                    <div class="text-white">
+                                        <h6 class="mb-0">${camera.name || `Camera ${id}`}</h6>
+                                        <small class="opacity-75">${camera.width}x${camera.height} @ ${camera.fps}fps</small>
+                                    </div>
+                                    <div>
+                                        <button class="btn btn-sm btn-light me-2 camera-power-btn" 
+                                                data-camera-id="${id}" 
+                                                data-running="${camera.running}">
+                                            <i class="fas fa-power-off"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-light camera-settings-btn" 
+                                                data-camera-id="${id}">
+                                            <i class="fas fa-cog"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                cameraGrid.appendChild(col);
+            });
+            
+            // Add event listeners to new buttons
+            setupCameraControls();
+            
+        } catch (error) {
+            console.error('Error updating camera grid:', error);
+        }
+    }
+    
+    // Setup camera control buttons
+    function setupCameraControls() {
+        // Power buttons
+        document.querySelectorAll('.camera-power-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const cameraId = e.currentTarget.dataset.cameraId;
+                const isRunning = e.currentTarget.dataset.running === 'true';
+                
+                try {
+                    const response = await fetch(`/api/cameras/${cameraId}/${isRunning ? 'stop' : 'start'}`, {
+                        method: 'POST'
+                    });
+                    
+                    if (response.ok) {
+                        updateCameraGrid();
+                    }
+                } catch (error) {
+                    console.error('Error toggling camera:', error);
+                }
+            });
+        });
+        
+        // Settings buttons
+        document.querySelectorAll('.camera-settings-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const cameraId = e.currentTarget.dataset.cameraId;
+                openCameraSettings(cameraId);
+            });
+        });
+    }
+    
+    // Handle adding new camera
+    document.getElementById('addCameraBtn').addEventListener('click', async () => {
+        const form = document.getElementById('addCameraForm');
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        
+        try {
+            const response = await fetch('/api/cameras', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addCameraModal'));
+                modal.hide();
+                form.reset();
+                updateCameraGrid();
+            }
+        } catch (error) {
+            console.error('Error adding camera:', error);
+        }
+    });
+    
+    // Function to open camera settings
+    async function openCameraSettings(cameraId) {
+        try {
+            const response = await fetch(`/api/cameras/${cameraId}`);
+            const camera = await response.json();
+            
+            const form = document.getElementById('cameraSettingsForm');
+            form.elements.camera_id.value = cameraId;
+            form.elements.name.value = camera.name || '';
+            form.elements.source.value = camera.source;
+            form.elements.width.value = camera.width;
+            form.elements.height.value = camera.height;
+            form.elements.fps.value = camera.fps;
+            
+            const modal = new bootstrap.Modal(document.getElementById('cameraSettingsModal'));
+            modal.show();
+        } catch (error) {
+            console.error('Error loading camera settings:', error);
+        }
+    }
+    
+    // Handle saving camera settings
+    document.getElementById('saveCameraBtn').addEventListener('click', async () => {
+        const form = document.getElementById('cameraSettingsForm');
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        const cameraId = data.camera_id;
+        
+        try {
+            const response = await fetch(`/api/cameras/${cameraId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('cameraSettingsModal'));
+                modal.hide();
+                updateCameraGrid();
+            }
+        } catch (error) {
+            console.error('Error updating camera settings:', error);
+        }
+    });
+    
+    // Handle deleting camera
+    document.getElementById('deleteCameraBtn').addEventListener('click', async () => {
+        const form = document.getElementById('cameraSettingsForm');
+        const cameraId = form.elements.camera_id.value;
+        
+        if (confirm(`Are you sure you want to delete camera ${cameraId}?`)) {
+            try {
+                const response = await fetch(`/api/cameras/${cameraId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('cameraSettingsModal'));
+                    modal.hide();
+                    updateCameraGrid();
+                }
+            } catch (error) {
+                console.error('Error deleting camera:', error);
+            }
+        }
+    });
+    
+    // Initial update
+    updateCameraGrid();
+    
+    // Update periodically
+    setInterval(updateCameraGrid, 5000);
+});
+</script>
+{% endblock %} 

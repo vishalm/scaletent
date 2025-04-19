@@ -1,0 +1,15 @@
+api:
+  host: localhost
+  port: 8000
+  websocket:
+    host: localhost
+    port: 8765
+detection:
+  confidence_threshold: 0.5
+  device: cpu
+  model_path: models/yolov8n.pt
+recognition:
+  database_path: data/face_database
+  embedder_model: models/facenet_model.pth
+  face_detector_model: models/face_detection_model.pth
+  similarity_threshold: 0.7

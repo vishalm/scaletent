@@ -13,19 +13,23 @@ from io import BytesIO
 from pathlib import Path
 from typing import List, Optional, Dict, Any, Union
 
-from fastapi import APIRouter, HTTPException, Depends, Query, Path as PathParam
+from fastapi import APIRouter, HTTPException, Depends, Query, Path as PathParam, Body
 from fastapi import File, UploadFile, Form, Request, BackgroundTasks
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 
-from core.logger import setup_logger
-from core.config import Config
+from src.core.logger import setup_logger
+from src.core.config import Config
 
 logger = setup_logger(__name__)
 
 # Create router
-router = APIRouter(prefix="/api/v1")
+router = APIRouter(
+    prefix="/api",
+    tags=["api"],
+    responses={404: {"description": "Not found"}},
+)
 
 # ======== Models ========
 
@@ -173,45 +177,28 @@ async def get_api_key(
 
 # ======== Routes ========
 
-@router.get("/status", response_model=SystemStatus)
-async def get_status(
-    api_key: bool = Depends(get_api_key),
-    camera_manager = Depends(get_camera_manager),
-    detector = Depends(get_detector),
-    publisher = Depends(get_publisher),
-    config: Config = Depends(get_config)
-):
-    """Get system status"""
-    try:
-        # Get system start time from main app context
-        context = get_app_context()
-        start_time = context.get('start_time', time.time())
-        
-        # Prepare camera status
-        camera_status = {}
-        for camera_id, camera in camera_manager.cameras.items():
-            camera_status[camera_id] = {
-                "fps": camera.fps,
-                "frame_count": camera.frame_count,
-                "running": camera.is_running,
-                "last_error": camera.last_error
-            }
-        
-        # Prepare system status
-        status = {
-            "status": "running",
-            "version": config.get("system.version", "1.0.0"),
-            "uptime": time.time() - start_time,
-            "cameras": camera_status,
-            "detection_fps": round(1000 / detector.get_avg_inference_time(), 2) if detector.get_avg_inference_time() > 0 else 0,
-            "connected_clients": publisher.get_connection_count()
+@router.get("/status")
+async def get_status() -> Dict[str, Any]:
+    """Get system status."""
+    return {
+        "status": "running",
+        "version": "0.1.0"
+    }
+
+
+@router.get("/config")
+async def get_config() -> Dict[str, Any]:
+    """Get system configuration."""
+    return {
+        "detection": {
+            "enabled": True,
+            "confidence_threshold": 0.5
+        },
+        "recognition": {
+            "enabled": True,
+            "similarity_threshold": 0.7
         }
-        
-        return status
-        
-    except Exception as e:
-        logger.error(f"Error getting system status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    }
 
 
 @router.get("/detections/latest", response_model=DetectionResponse)
@@ -568,51 +555,163 @@ async def get_cameras(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/cameras/{camera_id}/start", response_model=Dict[str, Any])
-async def start_camera(
-    camera_id: str = PathParam(..., description="Camera ID to start"),
+@router.post("/cameras", response_model=Dict[str, Any])
+async def add_camera(
+    camera: CameraInfo,
     api_key: bool = Depends(get_api_key),
-    camera_manager = Depends(get_camera_manager)
+    camera_manager = Depends(get_camera_manager),
+    config: Config = Depends(get_config)
 ):
-    """Start a camera"""
+    """Add a new camera to the system"""
     try:
-        # Check if camera exists
-        if camera_id not in camera_manager.cameras:
+        # Check if camera ID already exists
+        if camera.id in camera_manager.cameras:
             return JSONResponse(
-                status_code=404,
-                content={"detail": f"Camera {camera_id} not found"}
+                status_code=400,
+                content={"detail": f"Camera {camera.id} already exists"}
             )
         
-        # Get camera
-        camera = camera_manager.cameras[camera_id]
+        # Create camera instance
+        new_camera = Camera(
+            camera_id=camera.id,
+            source=camera.source,
+            width=camera.width,
+            height=camera.height,
+            fps=camera.fps
+        )
         
-        # Check if already running
-        if camera.is_running:
-            return {
-                "status": "success",
-                "message": f"Camera {camera_id} is already running"
-            }
+        # Add to camera manager
+        camera_manager.cameras[camera.id] = new_camera
         
-        # Start camera
-        camera.start()
+        # Start camera if requested
+        if camera.running:
+            new_camera.start()
+            # Start processing task
+            task = asyncio.create_task(camera_manager._process_camera(camera.id))
+            camera_manager.processing_tasks[camera.id] = task
+        
+        # Update config
+        cameras_config = config.get("cameras", [])
+        cameras_config.append({
+            "id": camera.id,
+            "source": camera.source,
+            "width": camera.width,
+            "height": camera.height,
+            "fps": camera.fps,
+            "enabled": True
+        })
+        config.set("cameras", cameras_config)
+        config.save()
         
         return {
             "status": "success",
-            "message": f"Camera {camera_id} started successfully"
+            "message": f"Camera {camera.id} added successfully",
+            "camera": {
+                "id": camera.id,
+                "source": camera.source,
+                "width": camera.width,
+                "height": camera.height,
+                "fps": camera.fps,
+                "running": camera.running
+            }
         }
         
     except Exception as e:
-        logger.error(f"Error starting camera: {e}")
+        logger.error(f"Error adding camera: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/cameras/{camera_id}/stop", response_model=Dict[str, Any])
-async def stop_camera(
-    camera_id: str = PathParam(..., description="Camera ID to stop"),
+@router.put("/cameras/{camera_id}", response_model=Dict[str, Any])
+async def update_camera(
+    camera_id: str = PathParam(..., description="Camera ID to update"),
+    camera: CameraInfo = Body(...),
     api_key: bool = Depends(get_api_key),
-    camera_manager = Depends(get_camera_manager)
+    camera_manager = Depends(get_camera_manager),
+    config: Config = Depends(get_config)
 ):
-    """Stop a camera"""
+    """Update camera settings"""
+    try:
+        # Check if camera exists
+        if camera_id not in camera_manager.cameras:
+            return JSONResponse(
+                status_code=404,
+                content={"detail": f"Camera {camera_id} not found"}
+            )
+        
+        # Get existing camera
+        existing_camera = camera_manager.cameras[camera_id]
+        
+        # Stop camera if running
+        was_running = existing_camera.is_running
+        if was_running:
+            existing_camera.stop()
+            if camera_id in camera_manager.processing_tasks:
+                task = camera_manager.processing_tasks[camera_id]
+                if not task.done():
+                    task.cancel()
+                await task
+        
+        # Update camera settings
+        new_camera = Camera(
+            camera_id=camera_id,
+            source=camera.source,
+            width=camera.width,
+            height=camera.height,
+            fps=camera.fps
+        )
+        
+        # Replace in camera manager
+        camera_manager.cameras[camera_id] = new_camera
+        
+        # Start camera if it was running or requested
+        if was_running or camera.running:
+            new_camera.start()
+            # Start processing task
+            task = asyncio.create_task(camera_manager._process_camera(camera_id))
+            camera_manager.processing_tasks[camera_id] = task
+        
+        # Update config
+        cameras_config = config.get("cameras", [])
+        for i, cam_config in enumerate(cameras_config):
+            if cam_config.get("id") == camera_id:
+                cameras_config[i] = {
+                    "id": camera_id,
+                    "source": camera.source,
+                    "width": camera.width,
+                    "height": camera.height,
+                    "fps": camera.fps,
+                    "enabled": True
+                }
+                break
+        config.set("cameras", cameras_config)
+        config.save()
+        
+        return {
+            "status": "success",
+            "message": f"Camera {camera_id} updated successfully",
+            "camera": {
+                "id": camera_id,
+                "source": camera.source,
+                "width": camera.width,
+                "height": camera.height,
+                "fps": camera.fps,
+                "running": new_camera.is_running
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error updating camera: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/cameras/{camera_id}", response_model=Dict[str, Any])
+async def delete_camera(
+    camera_id: str = PathParam(..., description="Camera ID to delete"),
+    api_key: bool = Depends(get_api_key),
+    camera_manager = Depends(get_camera_manager),
+    config: Config = Depends(get_config)
+):
+    """Delete a camera from the system"""
     try:
         # Check if camera exists
         if camera_id not in camera_manager.cameras:
@@ -624,23 +723,33 @@ async def stop_camera(
         # Get camera
         camera = camera_manager.cameras[camera_id]
         
-        # Check if already stopped
-        if not camera.is_running:
-            return {
-                "status": "success",
-                "message": f"Camera {camera_id} is already stopped"
-            }
+        # Stop camera if running
+        if camera.is_running:
+            camera.stop()
+            if camera_id in camera_manager.processing_tasks:
+                task = camera_manager.processing_tasks[camera_id]
+                if not task.done():
+                    task.cancel()
+                await task
         
-        # Stop camera
-        camera.stop()
+        # Remove from camera manager
+        del camera_manager.cameras[camera_id]
+        if camera_id in camera_manager.processing_tasks:
+            del camera_manager.processing_tasks[camera_id]
+        
+        # Update config
+        cameras_config = config.get("cameras", [])
+        cameras_config = [cam for cam in cameras_config if cam.get("id") != camera_id]
+        config.set("cameras", cameras_config)
+        config.save()
         
         return {
             "status": "success",
-            "message": f"Camera {camera_id} stopped successfully"
+            "message": f"Camera {camera_id} deleted successfully"
         }
         
     except Exception as e:
-        logger.error(f"Error stopping camera: {e}")
+        logger.error(f"Error deleting camera: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

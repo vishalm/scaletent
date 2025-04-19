@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .chart-container {
+        position: relative;
+        height: 300px;
+    }
+    .metric-card {
+        transition: transform 0.2s;
+    }
+    .metric-card:hover {
+        transform: translateY(-5px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="h3 mb-0">Analytics</h1>
+            <div class="btn-group">
+                <button class="btn btn-outline-secondary" id="timeRangeBtn">
+                    <i class="fas fa-calendar me-2"></i>Last 24 Hours
+                </button>
+                <button class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown">
+                    <span class="visually-hidden">Toggle Dropdown</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="#" data-range="24h">Last 24 Hours</a></li>
+                    <li><a class="dropdown-item" href="#" data-range="7d">Last 7 Days</a></li>
+                    <li><a class="dropdown-item" href="#" data-range="30d">Last 30 Days</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="#" data-range="custom">Custom Range</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Key Metrics -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card metric-card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-primary bg-opacity-10 p-3 rounded-3 me-3">
+                        <i class="fas fa-users fa-lg text-primary"></i>
+                    </div>
+                    <h6 class="card-title mb-0">Total Visitors</h6>
+                </div>
+                <h2 class="mb-0" id="total-visitors">0</h2>
+                <small class="text-muted">In selected period</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card metric-card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-success bg-opacity-10 p-3 rounded-3 me-3">
+                        <i class="fas fa-user-check fa-lg text-success"></i>
+                    </div>
+                    <h6 class="card-title mb-0">Recognition Rate</h6>
+                </div>
+                <h2 class="mb-0" id="recognition-rate">0%</h2>
+                <small class="text-muted">Average success rate</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card metric-card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-info bg-opacity-10 p-3 rounded-3 me-3">
+                        <i class="fas fa-clock fa-lg text-info"></i>
+                    </div>
+                    <h6 class="card-title mb-0">Avg. Processing Time</h6>
+                </div>
+                <h2 class="mb-0" id="avg-processing-time">0ms</h2>
+                <small class="text-muted">Per detection</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card metric-card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-warning bg-opacity-10 p-3 rounded-3 me-3">
+                        <i class="fas fa-tachometer-alt fa-lg text-warning"></i>
+                    </div>
+                    <h6 class="card-title mb-0">System Load</h6>
+                </div>
+                <h2 class="mb-0" id="system-load">0%</h2>
+                <small class="text-muted">CPU utilization</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="row g-4">
+    <!-- Visitor Traffic -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-transparent border-0">
+                <h5 class="mb-0">Visitor Traffic</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="visitorChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recognition Distribution -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-transparent border-0">
+                <h5 class="mb-0">Recognition Distribution</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="recognitionChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Camera Performance -->
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-transparent border-0">
+                <h5 class="mb-0">Camera Performance</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="cameraChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- System Performance -->
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-transparent border-0">
+                <h5 class="mb-0">System Performance</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="performanceChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Date Range Modal -->
+<div class="modal fade" id="dateRangeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Select Date Range</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="dateRangeForm">
+                    <div class="mb-3">
+                        <label class="form-label">Start Date</label>
+                        <input type="datetime-local" class="form-control" name="start_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">End Date</label>
+                        <input type="datetime-local" class="form-control" name="end_date" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="applyDateRangeBtn">Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Chart.js defaults
+    Chart.defaults.font.family = "'Inter', system-ui, -apple-system, sans-serif";
+    Chart.defaults.color = '#6c757d';
+    Chart.defaults.elements.line.borderWidth = 2;
+    Chart.defaults.elements.point.radius = 3;
+    Chart.defaults.elements.point.hoverRadius = 5;
+    
+    // Initialize charts
+    const visitorChart = new Chart(document.getElementById('visitorChart'), {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Total Visitors',
+                data: [],
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+    
+    const recognitionChart = new Chart(document.getElementById('recognitionChart'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Recognized', 'Unknown'],
+            datasets: [{
+                data: [0, 0],
+                backgroundColor: ['#198754', '#dc3545']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+    
+    const cameraChart = new Chart(document.getElementById('cameraChart'), {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Detections',
+                data: [],
+                backgroundColor: '#0dcaf0'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+    
+    const performanceChart = new Chart(document.getElementById('performanceChart'), {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'CPU Usage',
+                data: [],
+                borderColor: '#ffc107',
+                borderDash: [5, 5]
+            }, {
+                label: 'Memory Usage',
+                data: [],
+                borderColor: '#20c997'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100
+                }
+            }
+        }
+    });
+    
+    // Time range selection
+    let currentRange = '24h';
+    let customStartDate = null;
+    let customEndDate = null;
+    
+    document.querySelectorAll('.dropdown-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const range = e.target.dataset.range;
+            
+            if (range === 'custom') {
+                const modal = new bootstrap.Modal(document.getElementById('dateRangeModal'));
+                modal.show();
+            } else {
+                currentRange = range;
+                document.getElementById('timeRangeBtn').textContent = e.target.textContent;
+                updateData();
+            }
+        });
+    });
+    
+    document.getElementById('applyDateRangeBtn').addEventListener('click', () => {
+        const form = document.getElementById('dateRangeForm');
+        customStartDate = form.elements.start_date.value;
+        customEndDate = form.elements.end_date.value;
+        
+        if (customStartDate && customEndDate) {
+            currentRange = 'custom';
+            document.getElementById('timeRangeBtn').textContent = 
+                `${new Date(customStartDate).toLocaleDateString()} - ${new Date(customEndDate).toLocaleDateString()}`;
+            
+            const modal = bootstrap.Modal.getInstance(document.getElementById('dateRangeModal'));
+            modal.hide();
+            
+            updateData();
+        }
+    });
+    
+    // Function to update all data
+    async function updateData() {
+        try {
+            // Prepare date range
+            let startDate, endDate;
+            
+            if (currentRange === 'custom') {
+                startDate = customStartDate;
+                endDate = customEndDate;
+            } else {
+                endDate = new Date().toISOString();
+                startDate = new Date();
+                
+                switch (currentRange) {
+                    case '24h':
+                        startDate.setHours(startDate.getHours() - 24);
+                        break;
+                    case '7d':
+                        startDate.setDate(startDate.getDate() - 7);
+                        break;
+                    case '30d':
+                        startDate.setDate(startDate.getDate() - 30);
+                        break;
+                }
+                
+                startDate = startDate.toISOString();
+            }
+            
+            // Fetch analytics data
+            const response = await fetch(`/api/analytics?start_date=${startDate}&end_date=${endDate}`);
+            const data = await response.json();
+            
+            // Update metrics
+            document.getElementById('total-visitors').textContent = data.total_visitors || 0;
+            document.getElementById('recognition-rate').textContent = 
+                `${((data.recognition_rate || 0) * 100).toFixed(1)}%`;
+            document.getElementById('avg-processing-time').textContent = 
+                `${(data.avg_processing_time || 0).toFixed(1)}ms`;
+            document.getElementById('system-load').textContent = 
+                `${(data.system_load || 0).toFixed(1)}%`;
+            
+            // Update visitor chart
+            visitorChart.data.labels = data.visitor_timeline.map(d => new Date(d.timestamp).toLocaleTimeString());
+            visitorChart.data.datasets[0].data = data.visitor_timeline.map(d => d.count);
+            visitorChart.update();
+            
+            // Update recognition chart
+            recognitionChart.data.datasets[0].data = [
+                data.recognized_count || 0,
+                data.unknown_count || 0
+            ];
+            recognitionChart.update();
+            
+            // Update camera chart
+            cameraChart.data.labels = Object.keys(data.camera_stats || {});
+            cameraChart.data.datasets[0].data = Object.values(data.camera_stats || {}).map(s => s.detection_count);
+            cameraChart.update();
+            
+            // Update performance chart
+            performanceChart.data.labels = data.performance_timeline.map(d => new Date(d.timestamp).toLocaleTimeString());
+            performanceChart.data.datasets[0].data = data.performance_timeline.map(d => d.cpu_usage);
+            performanceChart.data.datasets[1].data = data.performance_timeline.map(d => d.memory_usage);
+            performanceChart.update();
+            
+        } catch (error) {
+            console.error('Error updating analytics:', error);
+        }
+    }
+    
+    // Initial update
+    updateData();
+    
+    // Update periodically
+    setInterval(updateData, 60000); // Every minute
+});
+</script>
+{% endblock %} 

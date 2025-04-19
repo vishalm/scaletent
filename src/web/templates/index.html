@@ -1,334 +1,218 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} - ScaleTent</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/bootstrap.min.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/main.css') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
-</head>
-<body>
-    <div class="wrapper">
-        <!-- Sidebar -->
-        <nav id="sidebar">
-            <div class="sidebar-header">
-                <h3>ScaleTent</h3>
-                <p>Meet & Greet System</p>
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .metric-card {
+        transition: transform 0.2s;
+    }
+    .metric-card:hover {
+        transform: translateY(-5px);
+    }
+    .camera-feed {
+        aspect-ratio: 16/9;
+        background: #000;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .camera-feed img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1 class="h3 mb-4">Dashboard</h1>
+    </div>
+</div>
+
+<!-- Key Metrics -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card metric-card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-primary bg-opacity-10 p-3 rounded-3 me-3">
+                        <i class="fas fa-users fa-lg text-primary"></i>
+                    </div>
+                    <h6 class="card-title mb-0">Total Visitors</h6>
+                </div>
+                <h2 class="mb-0" id="total-visitors">0</h2>
+                <small class="text-muted">Today</small>
             </div>
-
-            <ul class="list-unstyled components">
-                <li class="active">
-                    <a href="/"><i class="fas fa-home"></i> Dashboard</a>
-                </li>
-                <li>
-                    <a href="/cameras"><i class="fas fa-video"></i> Camera Feeds</a>
-                </li>
-                <li>
-                    <a href="/analytics"><i class="fas fa-chart-bar"></i> Analytics</a>
-                </li>
-                <li>
-                    <a href="/profiles"><i class="fas fa-users"></i> Profiles</a>
-                </li>
-                <li>
-                    <a href="/settings"><i class="fas fa-cog"></i> Settings</a>
-                </li>
-            </ul>
-
-            <div class="sidebar-footer">
-                <p>Version 1.0.0</p>
-                <p>&copy; 2025 ScaleTent</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card metric-card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-success bg-opacity-10 p-3 rounded-3 me-3">
+                        <i class="fas fa-user-check fa-lg text-success"></i>
+                    </div>
+                    <h6 class="card-title mb-0">Known Faces</h6>
+                </div>
+                <h2 class="mb-0" id="known-faces">0</h2>
+                <small class="text-muted">Recognized today</small>
             </div>
-        </nav>
-
-        <!-- Page Content -->
-        <div id="content">
-            <nav class="navbar navbar-expand-lg navbar-light bg-light">
-                <div class="container-fluid">
-                    <button type="button" id="sidebarCollapse" class="btn btn-info">
-                        <i class="fas fa-bars"></i>
-                    </button>
-                    <div class="ml-auto">
-                        <span class="navbar-text">
-                            <i class="fas fa-user"></i> Admin
-                        </span>
-                        <a href="/logout" class="btn btn-outline-danger ml-2"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card metric-card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-warning bg-opacity-10 p-3 rounded-3 me-3">
+                        <i class="fas fa-camera fa-lg text-warning"></i>
                     </div>
+                    <h6 class="card-title mb-0">Active Cameras</h6>
                 </div>
-            </nav>
-
-            <div class="container-fluid main-content">
-                <h2>Dashboard</h2>
-                <p class="lead">Real-time detection and recognition status</p>
-
-                <!-- Status Cards -->
-                <div class="row status-cards">
-                    <div class="col-md-3">
-                        <div class="card bg-primary text-white">
-                            <div class="card-body">
-                                <h5 class="card-title"><i class="fas fa-video"></i> Cameras</h5>
-                                <h3 class="card-text" id="camera-count">0</h3>
-                            </div>
-                        </div>
+                <h2 class="mb-0" id="active-cameras">0</h2>
+                <small class="text-muted">Online now</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card metric-card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-info bg-opacity-10 p-3 rounded-3 me-3">
+                        <i class="fas fa-tachometer-alt fa-lg text-info"></i>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card bg-success text-white">
-                            <div class="card-body">
-                                <h5 class="card-title"><i class="fas fa-users"></i> People</h5>
-                                <h3 class="card-text" id="people-count">0</h3>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card bg-info text-white">
-                            <div class="card-body">
-                                <h5 class="card-title"><i class="fas fa-user-check"></i> Recognized</h5>
-                                <h3 class="card-text" id="recognized-count">0</h3>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card bg-warning text-white">
-                            <div class="card-body">
-                                <h5 class="card-title"><i class="fas fa-user-clock"></i> Unknown</h5>
-                                <h3 class="card-text" id="unknown-count">0</h3>
-                            </div>
-                        </div>
-                    </div>
+                    <h6 class="card-title mb-0">Processing Speed</h6>
                 </div>
+                <h2 class="mb-0" id="processing-speed">0</h2>
+                <small class="text-muted">FPS</small>
+            </div>
+        </div>
+    </div>
+</div>
 
-                <!-- Live Feed and Latest Detections -->
-                <div class="row mt-4">
-                    <div class="col-md-8">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5>Live Feed</h5>
-                                <select id="camera-select" class="form-control form-control-sm camera-select">
-                                    <option value="main-entrance-01">Main Entrance</option>
-                                    <option value="reception-desk-01">Reception Desk</option>
-                                </select>
-                            </div>
-                            <div class="card-body">
-                                <div class="live-feed">
-                                    <img id="live-feed-image" src="{{ url_for('static', path='/img/loading-feed.gif') }}" alt="Live Feed">
-                                    <div class="detection-overlay" id="detection-overlay"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5>Latest Detections</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="latest-detections" id="latest-detections">
-                                    <div class="alert alert-info">Waiting for detections...</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Recognition Timeline and System Status -->
-                <div class="row mt-4">
-                    <div class="col-md-8">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5>Recognition Timeline (24h)</h5>
-                            </div>
-                            <div class="card-body">
-                                <canvas id="recognitionChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5>System Status</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="system-status" id="system-status">
-                                    <div class="status-item">
-                                        <span class="status-label">System Uptime:</span>
-                                        <span class="status-value" id="uptime">00:00:00</span>
-                                    </div>
-                                    <div class="status-item">
-                                        <span class="status-label">Detection FPS:</span>
-                                        <span class="status-value" id="detection-fps">0</span>
-                                    </div>
-                                    <div class="status-item">
-                                        <span class="status-label">Connected Clients:</span>
-                                        <span class="status-value" id="connected-clients">0</span>
-                                    </div>
-                                    <div class="status-item">
-                                        <span class="status-label">System Status:</span>
-                                        <span class="status-value text-success" id="system-status-value">Running</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Quick Actions -->
-                        <div class="card mt-4">
-                            <div class="card-header">
-                                <h5>Quick Actions</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="quick-actions">
-                                    <button class="btn btn-primary" id="btn-add-person">
-                                        <i class="fas fa-user-plus"></i> Add Person
-                                    </button>
-                                    <button class="btn btn-success" id="btn-export-data">
-                                        <i class="fas fa-file-export"></i> Export Data
-                                    </button>
-                                    <button class="btn btn-warning" id="btn-system-status">
-                                        <i class="fas fa-sync"></i> Refresh Status
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+<!-- Recent Activity & Live Feeds -->
+<div class="row g-4">
+    <!-- Recent Activity -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-transparent border-0">
+                <h5 class="mb-0">Recent Activity</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush" id="activity-feed">
+                    <!-- Activity items will be dynamically added here -->
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Add Person Modal -->
-    <div class="modal fade" id="addPersonModal" tabindex="-1" role="dialog" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Add New Person</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <form id="add-person-form">
-                        <div class="form-group">
-                            <label for="person-id">ID *</label>
-                            <input type="text" class="form-control" id="person-id" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="person-name">Name *</label>
-                            <input type="text" class="form-control" id="person-name" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="person-role">Role</label>
-                            <input type="text" class="form-control" id="person-role">
-                        </div>
-                        <div class="form-group">
-                            <label for="person-organization">Organization</label>
-                            <input type="text" class="form-control" id="person-organization">
-                        </div>
-                        <div class="form-group">
-                            <label for="person-image">Image *</label>
-                            <input type="file" class="form-control-file" id="person-image" accept="image/*" required>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="btn-submit-person">Add Person</button>
+    
+    <!-- Live Camera Feeds -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Live Camera Feeds</h5>
+                <a href="/cameras" class="btn btn-sm btn-primary">
+                    <i class="fas fa-external-link-alt me-1"></i>View All
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="row g-4" id="camera-feeds">
+                    <!-- Camera feeds will be dynamically added here -->
                 </div>
             </div>
         </div>
     </div>
+</div>
+{% endblock %}
 
-    <!-- Export Data Modal -->
-    <div class="modal fade" id="exportDataModal" tabindex="-1" role="dialog" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Export Data</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <form id="export-data-form">
-                        <div class="form-group">
-                            <label for="export-type">Data Type</label>
-                            <select class="form-control" id="export-type">
-                                <option value="detections">Detection Data</option>
-                                <option value="profiles">Profile Data</option>
-                                <option value="analytics">Analytics Data</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="export-format">Format</label>
-                            <select class="form-control" id="export-format">
-                                <option value="json">JSON</option>
-                                <option value="csv">CSV</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="export-start-date">Start Date</label>
-                            <input type="date" class="form-control" id="export-start-date">
-                        </div>
-                        <div class="form-group">
-                            <label for="export-end-date">End Date</label>
-                            <input type="date" class="form-control" id="export-end-date">
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="btn-export">Export</button>
-                </div>
-            </div>
-        </div>
-    </div>
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Function to update metrics
+    async function updateMetrics() {
+        try {
+            const response = await fetch('/api/status');
+            const data = await response.json();
+            
+            // Update metrics
+            document.getElementById('total-visitors').textContent = data.total_visitors || 0;
+            document.getElementById('known-faces').textContent = data.known_faces || 0;
+            document.getElementById('active-cameras').textContent = data.active_cameras || 0;
+            document.getElementById('processing-speed').textContent = data.processing_fps?.toFixed(1) || 0;
+        } catch (error) {
+            console.error('Error updating metrics:', error);
+        }
+    }
 
-    <!-- Scripts -->
-    <script src="{{ url_for('static', path='/js/jquery-3.6.0.min.js') }}"></script>
-    <script src="{{ url_for('static', path='/js/bootstrap.bundle.min.js') }}"></script>
-    <script src="{{ url_for('static', path='/js/dashboard.js') }}"></script>
-    <script>
-        $(document).ready(function() {
-            // Initialize the dashboard
-            initDashboard();
+    // Function to update activity feed
+    async function updateActivityFeed() {
+        try {
+            const response = await fetch('/api/detections/latest');
+            const data = await response.json();
             
-            // Connect to WebSocket
-            connectWebSocket();
+            const activityFeed = document.getElementById('activity-feed');
+            activityFeed.innerHTML = ''; // Clear existing items
             
-            // Initialize timeline chart
-            initRecognitionChart();
-            
-            // Sidebar toggle
-            $('#sidebarCollapse').on('click', function() {
-                $('#sidebar').toggleClass('active');
+            // Add new items
+            data.detections?.forEach(detection => {
+                const time = new Date(data.timestamp).toLocaleTimeString();
+                const item = document.createElement('div');
+                item.className = 'list-group-item';
+                item.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <div class="me-3">
+                            <i class="fas fa-user-circle fa-2x text-muted"></i>
+                        </div>
+                        <div>
+                            <p class="mb-0">${detection.person_data?.name || 'Unknown Person'}</p>
+                            <small class="text-muted">${time} - Camera ${data.camera_id}</small>
+                        </div>
+                    </div>
+                `;
+                activityFeed.appendChild(item);
             });
+        } catch (error) {
+            console.error('Error updating activity feed:', error);
+        }
+    }
+
+    // Function to update camera feeds
+    async function updateCameraFeeds() {
+        try {
+            const response = await fetch('/api/cameras');
+            const data = await response.json();
             
-            // Modal triggers
-            $('#btn-add-person').on('click', function() {
-                $('#addPersonModal').modal('show');
-            });
+            const cameraFeeds = document.getElementById('camera-feeds');
+            cameraFeeds.innerHTML = ''; // Clear existing feeds
             
-            $('#btn-export-data').on('click', function() {
-                $('#exportDataModal').modal('show');
+            // Add camera feeds
+            Object.entries(data.cameras || {}).slice(0, 4).forEach(([id, camera]) => {
+                const col = document.createElement('div');
+                col.className = 'col-md-6';
+                col.innerHTML = `
+                    <div class="camera-feed">
+                        <img src="/api/cameras/${id}/snapshot" alt="Camera ${id}" 
+                             onerror="this.src='/static/img/offline.png'">
+                    </div>
+                    <div class="mt-2">
+                        <h6 class="mb-0">Camera ${id}</h6>
+                        <small class="text-muted">${camera.running ? 'Online' : 'Offline'}</small>
+                    </div>
+                `;
+                cameraFeeds.appendChild(col);
             });
-            
-            $('#btn-system-status').on('click', function() {
-                updateSystemStatus();
-            });
-            
-            // Form submissions
-            $('#btn-submit-person').on('click', function() {
-                submitAddPersonForm();
-            });
-            
-            $('#btn-export').on('click', function() {
-                exportData();
-            });
-            
-            // Camera select
-            $('#camera-select').on('change', function() {
-                changeCamera($(this).val());
-            });
-        });
-    </script>
-</body>
-</html>
+        } catch (error) {
+            console.error('Error updating camera feeds:', error);
+        }
+    }
+
+    // Update data periodically
+    updateMetrics();
+    updateActivityFeed();
+    updateCameraFeeds();
+    
+    setInterval(updateMetrics, 5000);
+    setInterval(updateActivityFeed, 2000);
+    setInterval(updateCameraFeeds, 1000);
+});
+</script>
+{% endblock %}

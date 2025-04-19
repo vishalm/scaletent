@@ -23,14 +23,6 @@ services:
       - CONFIG_PATH=/app/config
       - DATA_PATH=/app/data
       - LOGS_PATH=/app/logs
-    # Remove the generic GPU capabilities and use platform-specific settings
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: apple-gpu
-              count: 1
-              capabilities: [gpu]
     platform: linux/arm64  # Specify platform for Apple Silicon
     depends_on:
       - redis
