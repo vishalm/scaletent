@@ -1,0 +1,326 @@
+/* 
+ * ScaleTent Main CSS
+ * Styles for the ScaleTent web interface
+ */
+
+/* General Layout */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    color: #212529;
+    overflow-x: hidden;
+}
+
+.wrapper {
+    display: flex;
+    width: 100%;
+    align-items: stretch;
+}
+
+.main-content {
+    padding: 20px;
+}
+
+/* Sidebar */
+#sidebar {
+    min-width: 250px;
+    max-width: 250px;
+    background: #343a40;
+    color: #fff;
+    transition: all 0.3s;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#sidebar.active {
+    margin-left: -250px;
+}
+
+#sidebar .sidebar-header {
+    padding: 20px;
+    background: #212529;
+    text-align: center;
+}
+
+#sidebar .sidebar-header h3 {
+    margin: 0;
+    font-weight: 600;
+}
+
+#sidebar .sidebar-header p {
+    margin: 5px 0 0 0;
+    opacity: 0.8;
+    font-size: 0.9rem;
+}
+
+#sidebar ul.components {
+    padding: 20px 0;
+    border-bottom: 1px solid #4b545c;
+    flex-grow: 1;
+}
+
+#sidebar ul li {
+    padding: 0 15px;
+}
+
+#sidebar ul li a {
+    padding: 10px;
+    display: block;
+    color: #fff;
+    border-radius: 5px;
+    text-decoration: none;
+}
+
+#sidebar ul li a:hover {
+    background: #4b545c;
+}
+
+#sidebar ul li.active > a {
+    background: #007bff;
+    color: white;
+}
+
+#sidebar .sidebar-footer {
+    padding: 15px;
+    text-align: center;
+    font-size: 0.8rem;
+    opacity: 0.8;
+    border-top: 1px solid #4b545c;
+}
+
+/* Content */
+#content {
+    width: 100%;
+    min-height: 100vh;
+    transition: all 0.3s;
+    display: flex;
+    flex-direction: column;
+}
+
+.navbar {
+    padding: 15px 10px;
+    background: #fff;
+    border: none;
+    border-radius: 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-btn {
+    box-shadow: none;
+    outline: none !important;
+    border: none;
+}
+
+/* Status Cards */
+.status-cards {
+    margin-bottom: 20px;
+}
+
+.status-cards .card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.status-cards .card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+}
+
+.status-cards .card-title {
+    font-size: 1rem;
+    margin-bottom: 10px;
+}
+
+.status-cards .card-text {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 0;
+}
+
+/* Live Feed */
+.live-feed {
+    position: relative;
+    width: 100%;
+    height: 480px;
+    background-color: #000;
+    overflow: hidden;
+    border-radius: 5px;
+}
+
+.live-feed img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.detection-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.detection-box {
+    position: absolute;
+    border: 2px solid #4caf50;
+    border-radius: 3px;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+}
+
+.detection-label {
+    position: absolute;
+    top: -25px;
+    left: 0;
+    background-color: #4caf50;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.detection-label.unknown {
+    background-color: #ff9800;
+}
+
+.camera-select {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 100;
+    width: auto;
+    max-width: 200px;
+}
+
+/* Latest Detections */
+.latest-detections {
+    max-height: 480px;
+    overflow-y: auto;
+}
+
+.detection-entry {
+    padding: 10px;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    flex-direction: column;
+}
+
+.detection-entry:last-child {
+    border-bottom: none;
+}
+
+.detection-time {
+    font-size: 0.8rem;
+    opacity: 0.7;
+    margin-bottom: 3px;
+}
+
+.detection-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 3px;
+}
+
+.detection-info.recognized {
+    color: #4caf50;
+}
+
+.detection-info.unknown {
+    color: #ff9800;
+}
+
+.detection-camera {
+    font-size: 0.8rem;
+    opacity: 0.7;
+    font-style: italic;
+}
+
+/* System Status */
+.system-status {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.status-item:last-child {
+    border-bottom: none;
+}
+
+.status-label {
+    font-weight: 500;
+}
+
+.status-value {
+    font-weight: bold;
+}
+
+/* Quick Actions */
+.quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.quick-actions button {
+    flex: 1;
+    min-width: 120px;
+    margin-bottom: 10px;
+}
+
+/* Modals */
+.modal-content {
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.modal-header {
+    background-color: #f8f9fa;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    #sidebar {
+        margin-left: -250px;
+    }
+    #sidebar.active {
+        margin-left: 0;
+    }
+    .status-cards .card {
+        margin-bottom: 20px;
+    }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #aaa;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #888;
+}
