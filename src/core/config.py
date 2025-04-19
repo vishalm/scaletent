@@ -118,11 +118,16 @@ class Config:
         # Initialize config database
         self.db = ConfigDB(str(db_path))
         
-        # Initialize configuration
-        self._init_defaults()
-        self._migrate_yaml_to_db()
-        self._ensure_default_camera()
-        self._apply_performance_mode()
+        # Initialize configuration in correct order
+        self._init_defaults()  # First initialize default settings
+        self._ensure_default_camera()  # Then ensure default camera exists
+        self._migrate_yaml_to_db()  # Then migrate any YAML configs
+        self._apply_performance_mode()  # Finally apply performance settings
+        
+        # Verify default camera after all initialization
+        if not self.get_camera(self.DEFAULT_CAMERA['id']):
+            logger.warning("Default camera not found after initialization, adding it now")
+            self._ensure_default_camera()
     
     def _init_defaults(self):
         """Initialize default configuration values"""
@@ -190,11 +195,6 @@ class Config:
                                 self.db.add_camera(camera)
                     
                     logger.info("Migrated YAML configuration to SQLite")
-                    
-                    # Backup and remove the YAML file
-                    backup_path = self.config_path + '.bak'
-                    os.rename(self.config_path, backup_path)
-                    logger.info(f"Backed up YAML config to {backup_path}")
         except Exception as e:
             logger.error(f"Error migrating YAML config: {e}")
     
@@ -328,16 +328,43 @@ class Config:
     def get_cameras(self) -> List[Dict[str, Any]]:
         """Get all camera configurations"""
         try:
+            # First try to get cameras from database
             cameras = self.db.get_cameras()
-            # Ensure all default fields are present for each camera
+            
+            # If no cameras found, initialize with default camera
+            if not cameras:
+                logger.info("No cameras found in database, initializing with default camera")
+                try:
+                    # Add default camera to database
+                    self.add_camera(self.DEFAULT_CAMERA)
+                    # Retrieve all cameras again
+                    cameras = self.db.get_cameras()
+                except Exception as e:
+                    logger.error(f"Failed to initialize default camera: {e}")
+                    return [self.DEFAULT_CAMERA]  # Return default as last resort
+            
+            # Validate each camera configuration
+            valid_cameras = []
             for camera in cameras:
-                default_config = self.DEFAULT_CAMERA.copy()
-                default_config.update(camera)
-                camera.update(default_config)
-            return cameras
+                try:
+                    if self.validate_camera_config(camera):
+                        valid_cameras.append(camera)
+                    else:
+                        logger.warning(f"Invalid camera configuration found for camera {camera.get('id', 'unknown')}")
+                except Exception as e:
+                    logger.error(f"Error validating camera {camera.get('id', 'unknown')}: {e}")
+            
+            # If no valid cameras found after validation, return default
+            if not valid_cameras:
+                logger.warning("No valid cameras found after validation, returning default camera")
+                return [self.DEFAULT_CAMERA]
+                
+            return valid_cameras
+            
         except Exception as e:
             logger.error(f"Error getting cameras: {e}")
-            return []
+            # Return default camera as fallback in case of error
+            return [self.DEFAULT_CAMERA]
     
     def close(self):
         """Close database connection"""

@@ -360,22 +360,18 @@ class ConfigDB:
         cursor = conn.cursor()
 
         try:
-            cursor.execute("""
-                SELECT id, name, source, width, height, fps, processing_fps, enabled
-                FROM cameras
-            """)
+            cursor.execute("SELECT * FROM cameras")
+            columns = [description[0] for description in cursor.description]
             rows = cursor.fetchall()
 
-            return [{
-                "id": row[0],
-                "name": row[1],
-                "source": row[2],
-                "width": row[3],
-                "height": row[4],
-                "fps": row[5],
-                "processing_fps": row[6],
-                "enabled": bool(row[7])
-            } for row in rows]
+            cameras = []
+            for row in rows:
+                camera = dict(zip(columns, row))
+                # Convert enabled to boolean
+                camera['enabled'] = bool(camera['enabled'])
+                cameras.append(camera)
+
+            return cameras
 
         except Exception as e:
             logger.error(f"Error getting cameras: {e}")

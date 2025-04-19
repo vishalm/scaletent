@@ -15,8 +15,10 @@ from pathlib import Path
 import uvicorn
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from src.core.config import Config
 from src.core.logger import setup_logger
@@ -152,77 +154,65 @@ async def lifespan(app: FastAPI):
         yield
         return
 
-# Create FastAPI application
-app = FastAPI(
-    title="ScaleTent API",
-    description="API for ScaleTent Meet & Greet System",
-    version="1.0.0",
-    lifespan=lifespan
-)
+def create_app(config_path: str = "config/config.yaml", debug: bool = False) -> FastAPI:
+    """Create and configure the FastAPI application"""
+    # Create FastAPI application
+    app = FastAPI(
+        title="ScaleTent API",
+        description="API for ScaleTent Meet & Greet System",
+        version="1.0.0",
+        lifespan=lifespan
+    )
 
-# Set default config path
-app.state.config_path = "config/config.yaml"
-app.state.debug = False
+    # Set configuration
+    app.state.config_path = config_path
+    app.state.debug = debug
 
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    # Configure CORS
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # In production, replace with specific origins
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-# Mount static files and templates
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+    # Create required directories
+    static_dir = Path("src/web/static")
+    templates_dir = Path("src/web/templates")
+    static_dir.mkdir(parents=True, exist_ok=True)
+    templates_dir.mkdir(parents=True, exist_ok=True)
 
-# Create required directories
-static_dir = Path("src/web/static")
-templates_dir = Path("src/web/templates")
-static_dir.mkdir(parents=True, exist_ok=True)
-templates_dir.mkdir(parents=True, exist_ok=True)
+    # Mount static files
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-# Mount static files
-app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+    # Initialize templates
+    templates = Jinja2Templates(directory=str(templates_dir))
 
-# Initialize templates
-templates = Jinja2Templates(directory=str(templates_dir))
+    # Include API routes
+    app.include_router(api_router)
 
-# Web interface routes
-from fastapi import Request
+    # Web interface routes
+    @app.get("/", include_in_schema=False)
+    @app.head("/", include_in_schema=False)
+    async def root(request: Request):
+        """Root endpoint that serves the web interface"""
+        return templates.TemplateResponse("index.html", {"request": request})
 
-@app.get("/", include_in_schema=False)
-@app.head("/", include_in_schema=False)
-async def root(request: Request):
-    """Root endpoint that serves the web interface"""
-    return templates.TemplateResponse("index.html", {"request": request})
+    return app
 
-# Include API routes
-app.include_router(api_router)
+def main():
+    """Main entry point"""
+    args = parse_arguments()
+    app = create_app(config_path=args.config, debug=args.debug)
+    
+    # Run the application
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=5000,
+        log_level="info" if not args.debug else "debug"
+    )
 
 if __name__ == "__main__":
-    args = parse_arguments()
-    
-    # Update config path and debug mode from arguments
-    app.state.config_path = args.config
-    app.state.debug = args.debug
-    
-    try:
-        # Configure SSL if needed
-        if not configure_ssl():
-            logger.warning("Failed to configure SSL certificates")
-        
-        # Run the application
-        uvicorn.run(
-            app,
-            host=os.getenv("API_HOST", "0.0.0.0"),
-            port=int(os.getenv("API_PORT", 5000)),
-            reload=args.debug,
-            log_level="debug" if args.debug else "info"
-        )
-    except KeyboardInterrupt:
-        logger.info("Received keyboard interrupt. Exiting...")
-    except Exception as e:
-        logger.error(f"Unhandled exception: {e}")
-        sys.exit(1)
+    main()

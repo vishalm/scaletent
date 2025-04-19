@@ -5,7 +5,7 @@
 
 // Global configuration
 const config = {
-    apiBaseUrl: '/api',
+    apiBaseUrl: 'http://localhost:5000/api',
     wsBaseUrl: window.location.protocol === 'https:' ? 'wss://' : 'ws://' + window.location.host + '/api/ws',
     updateInterval: 5000
 };

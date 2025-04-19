@@ -7,67 +7,35 @@ import cv2
 import yaml
 import time
 from pathlib import Path
+import uvicorn
 
 from src.recognition.face_detector import FaceDetector
 from src.core.logger import setup_logger
+from src.core.config import Config
+from src.main import create_app
 
 logger = setup_logger(__name__)
 
 def main():
-    # Load configuration
+    # Initialize configuration
     config_path = Path("config/config.yaml")
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
+    if not config_path.exists():
+        logger.error(f"Configuration file not found: {config_path}")
+        return
     
-    # Initialize face detector with MediaPipe backend
-    detector = FaceDetector(
-        backend="mediapipe",
-        confidence_threshold=config["recognition"]["face_detection_threshold"],
-        device=config["system"]["device"]
+    # Initialize configuration
+    config = Config(str(config_path))
+    
+    # Create FastAPI application
+    app = create_app(config_path=str(config_path))
+    
+    # Run the application
+    uvicorn.run(
+        app,
+        host=config.get('api', 'rest.host', '0.0.0.0'),
+        port=config.get('api', 'rest.port', 5000),
+        log_level="info"
     )
-    
-    # Initialize camera
-    camera_config = config["cameras"][0]  # Using first camera (Mac built-in)
-    cap = cv2.VideoCapture(0)  # 0 is usually the built-in camera
-    
-    # Set camera properties
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, camera_config["width"])
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, camera_config["height"])
-    cap.set(cv2.CAP_PROP_FPS, camera_config["fps"])
-    
-    logger.info("Starting camera feed...")
-    
-    try:
-        while True:
-            # Read frame
-            ret, frame = cap.read()
-            if not ret:
-                logger.error("Failed to read frame from camera")
-                break
-            
-            # Detect faces
-            faces = detector.detect(frame)
-            
-            # Draw detections
-            frame_with_detections = detector.draw_face_detections(frame, faces)
-            
-            # Show frame
-            cv2.imshow("ScaleTent - Face Detection", frame_with_detections)
-            
-            # Break on 'q' press
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-            
-            # Control frame rate
-            time.sleep(1/camera_config["processing_fps"])
-    
-    except KeyboardInterrupt:
-        logger.info("Stopping camera feed...")
-    
-    finally:
-        # Clean up
-        cap.release()
-        cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     main() 

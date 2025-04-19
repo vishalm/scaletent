@@ -1,83 +1,147 @@
 # ScaleTent - Meet & Greet System Configuration
+# Example configuration file
 
 # System settings
 system:
   name: "ScaleTent"
   version: "1.0.0"
-  log_level: "INFO"
+  log_level: "info"  # debug, info, warning, error, critical
   log_dir: "logs"
-  log_file: "logs/app.log"
-  device: "cpu"
-
-# API settings
-api:
-  rest:
-    host: "127.0.0.1"
-    port: 8000
-  websocket:
-    host: "127.0.0.1"
-    port: 8001
-    use_ssl: false
-
-# Web interface settings
-web:
-  host: "127.0.0.1"
-  port: 5000
-  theme: "light"
+  device: "cpu"      # cpu, cuda:0, etc.
 
 # Detection settings
 detection:
-  model_path: "models/detection/yolov8n.pt"
+  model_path: "data/models/yolov8n.pt"
   confidence_threshold: 0.5
-  nms_threshold: 0.45
   device: "cpu"
-  classes: [0]  # 0 = person in COCO dataset
+  classes: [0]       # 0 = person in COCO dataset
   processing_fps: 15
 
 # Recognition settings
 recognition:
-  model_path: "models/recognition/facenet.pt"
-  similarity_threshold: 0.6
+  face_detector_model: "face_detection_model.pb"
+  embedder_model: "facenet_model.pb"
+  database_path: "data/profiles"
   face_detection_threshold: 0.6
-  backend: "facenet"
+  similarity_threshold: 0.7
+  backend: "facenet"  # facenet, arcface, or insightface
   device: "cpu"
+
+# Camera settings
+cameras:
+  - id: "mac-camera"
+    name: "Mac Built-in Camera"
+    source: "0"
+    width: 1280
+    height: 720
+    fps: 30
+    processing_fps: 15
+    enabled: true
+
+# Web interface settings
+web:
+  host: "0.0.0.0"
+  port: 5000
+  admin_username: "admin"
+  admin_password: "changeme"
+  session_secret: "changeme"
+  theme: "light"
 
 # Storage settings
 storage:
   database:
     type: "sqlite"
-    path: "data/config.db"
-  faces: "data/faces"
+    path: "data/scaletent.db"
+  
   save_detection_images: false
   detection_image_path: "data/detections"
   save_recognized_images: true
   recognized_image_path: "data/recognized"
 
-# Privacy settings
-privacy:
-  data_retention_days: 30
-  face_blur_in_recordings: true
-  consent_required: true
-  store_recognized_faces: false
-  store_unknown_faces: false
-  log_sensitivity: "medium"
-
 # Advanced settings
 advanced:
-  performance_mode: "balanced"
+  performance_mode: "balanced"  # low, balanced, high
   debug:
     save_debug_frames: false
     debug_frame_path: "debug/frames"
     profile_performance: false
     visualize_detections: true
 
-# Camera settings
-cameras:
-  - id: "mac-camera"
-    name: "MacBook Camera"
-    source: "0"
-    width: 1280
-    height: 720
-    fps: 30
-    processing_fps: 10
-    enabled: true 
+# API settings
+api:
+  websocket:
+    host: "0.0.0.0"
+    port: 8765
+    use_ssl: false
+    ssl_cert: null
+    ssl_key: null
+  
+  rest:
+    host: "0.0.0.0"
+    port: 5000
+    use_ssl: false
+    ssl_cert: null
+    ssl_key: null
+
+# Privacy settings
+privacy:
+  data_retention_days: 30              # Days to keep detection data
+  face_blur_in_recordings: true        # Blur faces in recorded videos
+  consent_required: true               # Require consent for face recognition
+  store_recognized_faces: false        # Store faces of recognized individuals
+  store_unknown_faces: false           # Store faces of unknown individuals
+  log_sensitivity: "medium"            # low, medium, high (controls what's logged)
+
+# Notification settings
+notifications:
+  enabled: true
+  methods:
+    webhook:
+      enabled: true
+      url: "https://example.com/webhook"
+      events: ["person_recognized", "new_person_detected", "system_status"]
+      
+    email:
+      enabled: false
+      smtp_server: "smtp.example.com"
+      smtp_port: 587
+      smtp_user: "notifications@example.com"
+      smtp_password: "changeme"
+      from_address: "notifications@example.com"
+      recipients: ["admin@example.com"]
+      events: ["person_recognized", "system_error"]
+      
+    slack:
+      enabled: false
+      webhook_url: "https://hooks.slack.com/services/XXXXXXXXXXX/YYYYYYYYYYY/ZZZZZZZZZZZZZZZZZZZZZZZZ"
+      channel: "#security"
+      events: ["person_recognized", "new_person_detected", "system_error"]
+      
+    sms:
+      enabled: false
+      service: "twilio"  # twilio, nexmo, etc.
+      account_sid: "your_account_sid"
+      auth_token: "your_auth_token"
+      from_number: "+15551234567"
+      to_numbers: ["+15557654321"]
+      events: ["system_error"]
+
+# Integration settings
+integrations:
+  crm:
+    enabled: false
+    type: "salesforce"  # salesforce, hubspot, etc.
+    api_key: null
+    api_url: null
+    
+  access_control:
+    enabled: false
+    type: "custom"  # custom, lenel, etc.
+    api_url: "http://localhost:8080/api/access"
+    api_key: null
+    
+  visitor_management:
+    enabled: false
+    type: "envoy"  # envoy, proxyclick, etc.
+    api_url: null
+    api_key: null

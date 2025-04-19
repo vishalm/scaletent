@@ -218,13 +218,29 @@
             };
 
             try {
-                const response = await fetch('/api/cameras', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(config)
-                });
+                // First check if camera exists
+                const getResponse = await fetch(`/api/cameras/${config.id}`);
+                
+                let response;
+                if (getResponse.status === 404) {
+                    // Camera doesn't exist, use POST to create
+                    response = await fetch('/api/cameras', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(config)
+                    });
+                } else {
+                    // Camera exists, use PUT to update
+                    response = await fetch(`/api/cameras/${config.id}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(config)
+                    });
+                }
 
                 if (response.ok) {
                     // Update UI elements
@@ -239,12 +255,12 @@
                     
                     alert('Camera configuration saved successfully!');
                 } else {
-                    const error = await response.text();
-                    throw new Error(error);
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Failed to save camera configuration');
                 }
             } catch (error) {
                 console.error('Error saving camera configuration:', error);
-                alert('Failed to save camera configuration. Please check the console for details.');
+                alert(error.message || 'Failed to save camera configuration. Please check the console for details.');
             }
         }
 
