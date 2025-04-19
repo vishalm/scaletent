@@ -1,7 +1,7 @@
 # ScaleTent
 
 <p align="center">
-  <img src="docs/images/logo.png" alt="ScaleTent Logo" width="200"/>
+  <img src="doc-resources/ScaleTent-logo.svg" alt="ScaleTent Logo" width="200"/>
 </p>
 
 <p align="center">
@@ -33,10 +33,14 @@ ScaleTent is an intelligent person detection and identification system designed 
 ## Architecture
 
 <p align="center">
-  <img src="docs/images/architecture.png" alt="ScaleTent Architecture" width="800"/>
+  <img src="doc-resources/conceptual-architecture.svg" alt="ScaleTent Architecture" width="800"/>
 </p>
 
 The ScaleTent system consists of the following components:
+
+<p align="center">
+  <img src="doc-resources/simulation.svg" alt="ScaleTent Architecture" width="800"/>
+</p>
 
 ### 1. Input Layer
 - Multiple camera feeds support (USB, IP cameras, RTSP streams)
