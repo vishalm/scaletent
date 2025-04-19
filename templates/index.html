@@ -1,0 +1,153 @@
+<!-- Add this section to your existing HTML -->
+<div class="statistics-panel">
+    <h2>System Statistics</h2>
+    
+    <div class="stats-section">
+        <h3>Performance Metrics</h3>
+        <div class="stats-content">
+            <p>Count: <span id="performance-count">0</span></p>
+            <p>Oldest: <span id="performance-oldest">N/A</span></p>
+            <p>Newest: <span id="performance-newest">N/A</span></p>
+            <button onclick="resetStatistics('performance')" class="reset-btn">Reset Performance Stats</button>
+        </div>
+    </div>
+    
+    <div class="stats-section">
+        <h3>Face Detections</h3>
+        <div class="stats-content">
+            <p>Count: <span id="faces-count">0</span></p>
+            <p>Oldest: <span id="faces-oldest">N/A</span></p>
+            <p>Newest: <span id="faces-newest">N/A</span></p>
+            <button onclick="resetStatistics('camera')" class="reset-btn">Reset Detection Stats</button>
+        </div>
+    </div>
+    
+    <div class="stats-section">
+        <h3>Error Logs</h3>
+        <div class="stats-content">
+            <p>Count: <span id="errors-count">0</span></p>
+            <p>Oldest: <span id="errors-oldest">N/A</span></p>
+            <p>Newest: <span id="errors-newest">N/A</span></p>
+            <button onclick="resetStatistics('errors')" class="reset-btn">Reset Error Logs</button>
+        </div>
+    </div>
+    
+    <div class="stats-section">
+        <h3>Storage Usage</h3>
+        <div class="stats-content">
+            <p>Total Size: <span id="storage-size">0 MB</span></p>
+        </div>
+    </div>
+    
+    <div class="stats-actions">
+        <button onclick="resetStatistics('all')" class="reset-btn reset-all">Reset All Statistics</button>
+        <button onclick="updateStatsSummary()" class="refresh-btn">Refresh Statistics</button>
+    </div>
+</div>
+
+<style>
+.statistics-panel {
+    background: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.stats-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 1px solid #eee;
+    border-radius: 4px;
+}
+
+.stats-section h3 {
+    margin: 0 0 10px 0;
+    color: #333;
+}
+
+.stats-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    align-items: center;
+}
+
+.stats-content p {
+    margin: 5px 0;
+    font-size: 14px;
+}
+
+.stats-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    justify-content: flex-end;
+}
+
+.reset-btn {
+    background: #ff4444;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.reset-btn:hover {
+    background: #cc0000;
+}
+
+.reset-all {
+    background: #ff1111;
+}
+
+.refresh-btn {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.refresh-btn:hover {
+    background: #388E3C;
+}
+
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px;
+    border-radius: 4px;
+    color: white;
+    z-index: 1000;
+    animation: slideIn 0.3s ease-out;
+}
+
+.notification.success {
+    background: #4CAF50;
+}
+
+.notification.error {
+    background: #f44336;
+}
+
+.notification.info {
+    background: #2196F3;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+</style> 

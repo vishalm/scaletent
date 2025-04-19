@@ -191,22 +191,20 @@ class FaceDetector:
         
         if results.detections:
             for detection in results.detections:
-                # Get bounding box
+                # Get bounding box (already normalized)
                 bbox = detection.location_data.relative_bounding_box
                 
-                # Convert relative coordinates to absolute
-                x1 = int(bbox.xmin * width)
-                y1 = int(bbox.ymin * height)
-                w = int(bbox.width * width)
-                h = int(bbox.height * height)
-                x2 = x1 + w
-                y2 = y1 + h
+                # Keep normalized coordinates
+                x1 = bbox.xmin
+                y1 = bbox.ymin
+                x2 = x1 + bbox.width
+                y2 = y1 + bbox.height
                 
-                # Ensure box is within frame boundaries
-                x1 = max(0, x1)
-                y1 = max(0, y1)
-                x2 = min(width, x2)
-                y2 = min(height, y2)
+                # Ensure coordinates are within [0,1]
+                x1 = max(0.0, min(1.0, x1))
+                y1 = max(0.0, min(1.0, y1))
+                x2 = max(0.0, min(1.0, x2))
+                y2 = max(0.0, min(1.0, y2))
                 
                 # Skip invalid detections
                 if x1 >= x2 or y1 >= y2:
@@ -246,11 +244,17 @@ class FaceDetector:
                 if confidence < self.confidence_threshold:
                     continue
                 
-                # Ensure box is within frame boundaries
-                x1 = max(0, x1)
-                y1 = max(0, y1)
-                x2 = min(width, x2)
-                y2 = min(height, y2)
+                # Normalize coordinates
+                x1 = x1 / width
+                y1 = y1 / height
+                x2 = x2 / width
+                y2 = y2 / height
+                
+                # Ensure coordinates are within [0,1]
+                x1 = max(0.0, min(1.0, x1))
+                y1 = max(0.0, min(1.0, y1))
+                x2 = max(0.0, min(1.0, x2))
+                y2 = max(0.0, min(1.0, y2))
                 
                 # Skip invalid detections
                 if x1 >= x2 or y1 >= y2:
@@ -280,16 +284,21 @@ class FaceDetector:
         
         Args:
             frame (numpy.ndarray): Input frame
-            face_detections (list): List of face detection results
+            face_detections (list): List of face detection results with normalized coordinates
         
         Returns:
             numpy.ndarray: Frame with bounding boxes drawn
         """
         output_frame = frame.copy()
+        height, width = frame.shape[:2]
         
         for detection in face_detections:
-            # Get bounding box coordinates
+            # Get normalized coordinates and convert to absolute
             x1, y1, x2, y2 = detection['bbox']
+            x1 = int(x1 * width)
+            y1 = int(y1 * height)
+            x2 = int(x2 * width)
+            y2 = int(y2 * height)
             
             # Draw bounding box
             cv2.rectangle(output_frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
@@ -326,7 +335,10 @@ class FaceDetector:
                 landmarks = detection['landmarks']
                 for point in landmarks.values():
                     x, y = point
-                    cv2.circle(output_frame, (int(x), int(y)), 2, (0, 255, 0), -1)
+                    # Convert normalized landmark coordinates to absolute
+                    x = int(x * width)
+                    y = int(y * height)
+                    cv2.circle(output_frame, (x, y), 2, (0, 255, 0), -1)
         
         return output_frame
 

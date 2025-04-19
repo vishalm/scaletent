@@ -23,7 +23,7 @@ def main():
     detector = FaceDetector(
         backend="mediapipe",
         confidence_threshold=config["recognition"]["face_detection_threshold"],
-        device=config["system"]["device"]["type"]
+        device=config["system"]["device"]
     )
     
     # Initialize camera

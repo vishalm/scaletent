@@ -6,6 +6,8 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
+export OPENCV_AVFOUNDATION_SKIP_AUTH=1
+
 
 # Error handling
 set -e  # Exit on error
@@ -232,7 +234,8 @@ main() {
     echo -e "\n${YELLOW}Starting ScaleTent application components...${NC}"
     start_in_terminal "ScaleTent Web Interface" "uvicorn src.web.app:app --host 0.0.0.0 --port 8000 --reload"
     start_in_terminal "ScaleTent API Server" "uvicorn src.main:app --host 0.0.0.0 --port 5000 --reload"
-    start_in_terminal "ScaleTent Camera Demo" "python run_local.py"
+    # start_in_terminal "ScaleTent Camera Demo" "export OPENCV_AVFOUNDATION_SKIP_AUTH=1 && python run_local.py"
+    start_in_terminal "ScaleTent Camera Demo" "env OPENCV_AVFOUNDATION_SKIP_AUTH=1 python run_local.py"
     
     # Create stop script
     create_stop_script

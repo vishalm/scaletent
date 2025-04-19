@@ -8,7 +8,7 @@ import torch
 from pathlib import Path
 import pickle
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from facenet_pytorch import InceptionResnetV1
 from PIL import Image
 
@@ -267,6 +267,96 @@ class FaceMatcher:
             return 0
         return sum(self.matching_times) / len(self.matching_times) * 1000
 
-    def match(self, face_image: np.ndarray) -> Optional[Dict[str, float]]:
-        """Match a face against the database."""
-        return None
+    def match(self, face_image: np.ndarray) -> Optional[Dict[str, Any]]:
+        """
+        Match a face image against the database
+        
+        Args:
+            face_image (numpy.ndarray): Face image to match
+            
+        Returns:
+            dict or None: Match result containing:
+                - 'id': str - Identity ID
+                - 'similarity': float - Similarity score
+                - 'metadata': dict - Person metadata
+                or None if no match found
+        """
+        try:
+            # Generate embedding
+            embedding = self.generate_embedding(face_image)
+            if embedding is None:
+                return None
+            
+            # Match against database
+            identity_id, similarity = self.match_face(embedding)
+            
+            if identity_id is not None:
+                person_data = self.known_embeddings[identity_id].copy()
+                person_data.pop('embedding', None)  # Remove embedding from response
+                
+                return {
+                    'id': identity_id,
+                    'similarity': similarity,
+                    'metadata': person_data.get('metadata', {})
+                }
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error in match: {e}")
+            return None
+
+    def match_face_in_frame(self, frame: np.ndarray, face_detection: Dict[str, Any]) -> Tuple[bool, Optional[str], float, Optional[Dict]]:
+        """
+        Match a face detected in a frame against the database
+        
+        Args:
+            frame (numpy.ndarray): Full frame containing the face
+            face_detection (dict): Face detection data including bounding box
+                Expected keys:
+                - 'bbox': List[float] - [x1, y1, x2, y2] normalized coordinates
+                - 'confidence': float - Detection confidence score
+        
+        Returns:
+            tuple:
+                - bool: Whether face was recognized
+                - str or None: Identity ID if recognized, None otherwise  
+                - float: Similarity score (0-1)
+                - dict or None: Person metadata if recognized, None otherwise
+        """
+        try:
+            # Extract face region
+            h, w = frame.shape[:2]
+            x1, y1, x2, y2 = face_detection['bbox']
+            x1, y1, x2, y2 = int(x1 * w), int(y1 * h), int(x2 * w), int(y2 * h)
+            
+            # Validate bbox
+            if x2 <= x1 or y2 <= y1:
+                logger.warning("Invalid face bounding box")
+                return False, None, 0.0, None
+                
+            face_img = frame[y1:y2, x1:x2]
+            if face_img.size == 0:
+                logger.warning("Empty face region extracted")
+                return False, None, 0.0, None
+            
+            # Generate embedding
+            embedding = self.generate_embedding(face_img)
+            if embedding is None:
+                return False, None, 0.0, None
+            
+            # Match against database
+            identity_id, similarity = self.match_face(embedding)
+            
+            if identity_id is not None:
+                # Get person metadata
+                person_data = self.known_embeddings[identity_id].copy()
+                # Remove embedding from metadata
+                person_data.pop('embedding', None)
+                return True, identity_id, similarity, person_data
+            
+            return False, None, similarity, None
+            
+        except Exception as e:
+            logger.error(f"Error in match_face_in_frame: {e}")
+            return False, None, 0.0, None

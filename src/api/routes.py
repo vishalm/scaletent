@@ -21,6 +21,8 @@ from pydantic import BaseModel, Field
 
 from src.core.logger import setup_logger
 from src.core.config import Config
+from src.core.camera import Camera
+from src.core.db_manager import DatabaseManager
 
 logger = setup_logger(__name__)
 
@@ -74,12 +76,12 @@ class RegistrationRequest(BaseModel):
 class CameraInfo(BaseModel):
     id: str
     name: Optional[str] = None
-    source: str
+    source: Union[str, int]
     width: int
     height: int
     fps: int
-    running: bool
-    frame_count: int
+    running: bool = False
+    frame_count: int = 0
 
 
 class SystemStatus(BaseModel):
@@ -127,26 +129,48 @@ def get_face_matcher(request: Request):
 
 def get_camera_manager(request: Request):
     """Dependency to get camera manager instance"""
-    context = get_app_context()
-    return context.get('camera_manager')
+    if not hasattr(request.app.state, 'components') or 'camera_manager' not in request.app.state.components:
+        raise HTTPException(
+            status_code=503,
+            detail="Camera manager not initialized"
+        )
+    return request.app.state.components['camera_manager']
 
 
 def get_publisher(request: Request):
     """Dependency to get publisher instance"""
-    context = get_app_context()
-    return context.get('publisher')
-
-
-def get_config(request: Request):
-    """Dependency to get config instance"""
-    context = get_app_context()
-    return context.get('config')
+    if not hasattr(request.app.state, 'components') or 'publisher' not in request.app.state.components:
+        raise HTTPException(
+            status_code=503,
+            detail="Publisher not initialized"
+        )
+    return request.app.state.components['publisher']
 
 
 def get_database(request: Request):
     """Dependency to get database instance"""
-    context = get_app_context()
-    return context.get('database')
+    if not hasattr(request.app.state, 'components') or 'database' not in request.app.state.components:
+        raise HTTPException(
+            status_code=503,
+            detail="Database not initialized"
+        )
+    return request.app.state.components['database']
+
+
+def get_config(request: Request) -> Config:
+    """Dependency to get config instance"""
+    if not hasattr(request.app.state, 'config'):
+        raise HTTPException(
+            status_code=503,
+            detail="Configuration not initialized"
+        )
+    return request.app.state.config
+
+
+def get_api_key(request: Request) -> bool:
+    """Dependency to check API key"""
+    # TODO: Implement API key validation
+    return True
 
 
 # API Key security (if enabled)
@@ -591,17 +615,22 @@ async def add_camera(
             camera_manager.processing_tasks[camera.id] = task
         
         # Update config
-        cameras_config = config.get("cameras", [])
-        cameras_config.append({
+        current_cameras = config.get("cameras", [])
+        current_cameras.append({
             "id": camera.id,
+            "name": camera.name,
             "source": camera.source,
             "width": camera.width,
             "height": camera.height,
             "fps": camera.fps,
+            "processing_fps": 15,  # Default processing FPS
             "enabled": True
         })
-        config.set("cameras", cameras_config)
-        config.save()
+        
+        # Update the entire configuration
+        config_data = config.get_all()
+        config_data["cameras"] = current_cameras
+        config.save_to_file()
         
         return {
             "status": "success",
@@ -672,19 +701,38 @@ async def update_camera(
         
         # Update config
         cameras_config = config.get("cameras", [])
+        updated = False
         for i, cam_config in enumerate(cameras_config):
             if cam_config.get("id") == camera_id:
                 cameras_config[i] = {
                     "id": camera_id,
+                    "name": camera.name,
                     "source": camera.source,
                     "width": camera.width,
                     "height": camera.height,
                     "fps": camera.fps,
+                    "processing_fps": cam_config.get("processing_fps", 15),  # Preserve existing processing FPS
                     "enabled": True
                 }
+                updated = True
                 break
-        config.set("cameras", cameras_config)
-        config.save()
+        
+        if not updated:
+            cameras_config.append({
+                "id": camera_id,
+                "name": camera.name,
+                "source": camera.source,
+                "width": camera.width,
+                "height": camera.height,
+                "fps": camera.fps,
+                "processing_fps": 15,  # Default processing FPS
+                "enabled": True
+            })
+        
+        # Update the entire configuration
+        config_data = config.get_all()
+        config_data["cameras"] = cameras_config
+        config.save_to_file()
         
         return {
             "status": "success",
@@ -741,7 +789,7 @@ async def delete_camera(
         cameras_config = config.get("cameras", [])
         cameras_config = [cam for cam in cameras_config if cam.get("id") != camera_id]
         config.set("cameras", cameras_config)
-        config.save()
+        config.save_to_file()
         
         return {
             "status": "success",
@@ -800,6 +848,94 @@ async def get_camera_snapshot(
         raise
     except Exception as e:
         logger.error(f"Error getting camera snapshot: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/cameras/{camera_id}/start", response_model=Dict[str, Any])
+async def start_camera(
+    camera_id: str = PathParam(..., description="Camera ID to start"),
+    api_key: bool = Depends(get_api_key),
+    camera_manager = Depends(get_camera_manager)
+):
+    """Start a camera"""
+    try:
+        # Check if camera exists
+        if camera_id not in camera_manager.cameras:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Camera {camera_id} not found"
+            )
+        
+        # Get camera
+        camera = camera_manager.cameras[camera_id]
+        
+        # Start camera if not running
+        if not camera.is_running:
+            camera.start()
+            # Start processing task
+            task = asyncio.create_task(camera_manager._process_camera(camera_id))
+            camera_manager.processing_tasks[camera_id] = task
+        
+        return {
+            "status": "success",
+            "message": f"Camera {camera_id} started successfully",
+            "camera": {
+                "id": camera_id,
+                "source": camera.source,
+                "width": camera.width,
+                "height": camera.height,
+                "fps": camera.fps,
+                "running": camera.is_running
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error starting camera: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/cameras/{camera_id}/stop", response_model=Dict[str, Any])
+async def stop_camera(
+    camera_id: str = PathParam(..., description="Camera ID to stop"),
+    api_key: bool = Depends(get_api_key),
+    camera_manager = Depends(get_camera_manager)
+):
+    """Stop a camera"""
+    try:
+        # Check if camera exists
+        if camera_id not in camera_manager.cameras:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Camera {camera_id} not found"
+            )
+        
+        # Get camera
+        camera = camera_manager.cameras[camera_id]
+        
+        # Stop camera if running
+        if camera.is_running:
+            camera.stop()
+            if camera_id in camera_manager.processing_tasks:
+                task = camera_manager.processing_tasks[camera_id]
+                if not task.done():
+                    task.cancel()
+                await task
+        
+        return {
+            "status": "success",
+            "message": f"Camera {camera_id} stopped successfully",
+            "camera": {
+                "id": camera_id,
+                "source": camera.source,
+                "width": camera.width,
+                "height": camera.height,
+                "fps": camera.fps,
+                "running": camera.is_running
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error stopping camera: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -935,6 +1071,53 @@ async def cleanup_old_data(
         
     except Exception as e:
         logger.error(f"Error cleaning up old data: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/stats/reset")
+async def reset_statistics(
+    camera_id: Optional[str] = None,
+    reset_type: str = Query("all", enum=["all", "performance", "errors", "camera"]),
+    older_than_days: Optional[int] = None
+) -> Dict[str, Any]:
+    """Reset statistics based on parameters"""
+    try:
+        if reset_type == "all":
+            success = db.reset_all_stats()
+        elif reset_type == "performance":
+            success = db.reset_performance_metrics(camera_id, older_than_days)
+        elif reset_type == "errors":
+            success = db.reset_error_logs(camera_id)
+        elif reset_type == "camera" and camera_id:
+            success = db.reset_camera_stats(camera_id)
+        else:
+            raise HTTPException(status_code=400, detail="Invalid reset type or missing camera_id")
+        
+        if success:
+            # Get updated statistics summary
+            summary = db.get_stats_summary(camera_id)
+            return {
+                "status": "success",
+                "message": f"Reset {reset_type} statistics successfully",
+                "summary": summary
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to reset statistics")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/stats/summary")
+async def get_statistics_summary(camera_id: Optional[str] = None) -> Dict[str, Any]:
+    """Get summary of current statistics"""
+    try:
+        summary = db.get_stats_summary(camera_id)
+        return {
+            "status": "success",
+            "data": summary
+        }
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
