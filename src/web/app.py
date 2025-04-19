@@ -20,213 +20,180 @@ from src.utils.ssl_utils import configure_ssl
 
 logger = setup_logger(__name__)
 
-class WebApp:
-    """
-    Web application for ScaleTent
-    """
-    
-    def __init__(self, config):
-        """
-        Initialize web application
-        
-        Args:
-            config: Configuration object
-        """
-        self.config = config
-        self.app = FastAPI(
-            title="ScaleTent API",
-            description="API for ScaleTent Meet & Greet System",
-            version="1.0.0",
-            docs_url="/api/docs",
-            redoc_url="/api/redoc",
-            openapi_url="/api/openapi.json"
-        )
-        
-        # Configure CORS
-        self.app.add_middleware(
-            CORSMiddleware,
-            allow_origins=["*"],  # In production, replace with specific origins
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
-        
-        # Configure SSL certificates
-        if not configure_ssl():
-            logger.warning("Failed to configure SSL certificates")
-        
-        self.setup_routes()
-        self.server = None
-        
-        logger.info("Web application initialized")
-    
-    def setup_routes(self):
-        """Set up web application routes"""
-        # Get base directory
-        base_dir = Path(__file__).parent
-        
-        # Set up static files
-        self.app.mount(
-            "/static",
-            StaticFiles(directory=base_dir / "static"),
-            name="static"
-        )
-        
-        # Set up templates
-        self.templates = Jinja2Templates(directory=base_dir / "templates")
-        
-        # Include API routes under /api prefix
-        self.app.include_router(api_router, prefix="/api")
-        
-        # Set up web routes
-        @self.app.get("/", response_class=HTMLResponse)
-        async def index(request: Request):
-            """Main dashboard page"""
-            return self.templates.TemplateResponse(
-                "index.html",
-                {
-                    "request": request,
-                    "title": "ScaleTent Dashboard"
-                }
-            )
-        
-        @self.app.get("/health")
-        async def health_check():
-            """Health check endpoint"""
-            return {"status": "healthy"}
-        
-        @self.app.get("/cameras", response_class=HTMLResponse)
-        async def cameras(request: Request):
-            """Cameras page"""
-            return self.templates.TemplateResponse(
-                "cameras.html",
-                {
-                    "request": request,
-                    "title": "Camera Feeds"
-                }
-            )
-        
-        @self.app.get("/analytics", response_class=HTMLResponse)
-        async def analytics(request: Request):
-            """Analytics page"""
-            return self.templates.TemplateResponse(
-                "analytics.html",
-                {
-                    "request": request,
-                    "title": "Detection Analytics"
-                }
-            )
-        
-        @self.app.get("/profiles", response_class=HTMLResponse)
-        async def profiles(request: Request):
-            """Profiles management page"""
-            return self.templates.TemplateResponse(
-                "profiles.html",
-                {
-                    "request": request,
-                    "title": "Profile Management"
-                }
-            )
-        
-        @self.app.get("/settings", response_class=HTMLResponse)
-        async def settings(request: Request):
-            """Settings page"""
-            return self.templates.TemplateResponse(
-                "settings.html",
-                {
-                    "request": request,
-                    "title": "System Settings"
-                }
-            )
-        
-        # Error handlers
-        @self.app.exception_handler(HTTPException)
-        async def http_exception_handler(request: Request, exc: HTTPException):
-            """Handle HTTP exceptions"""
-            return JSONResponse(
-                status_code=exc.status_code,
-                content={
-                    "error": exc.detail,
-                    "status_code": exc.status_code
-                }
-            )
-        
-        @self.app.exception_handler(Exception)
-        async def general_exception_handler(request: Request, exc: Exception):
-            """Handle general exceptions"""
-            logger.error(f"Unhandled exception: {exc}", exc_info=True)
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "error": "Internal server error",
-                    "status_code": 500
-                }
-            )
-    
-    async def start(self):
-        """Start the web application server"""
-        try:
-            host = self.config.get("web.host", "0.0.0.0")
-            port = self.config.get("web.port", 8000)
-            
-            config = uvicorn.Config(
-                self.app,
-                host=host,
-                port=port,
-                log_level="info",
-                ssl_keyfile=self.config.get("ssl.keyfile"),
-                ssl_certfile=self.config.get("ssl.certfile"),
-                reload=self.config.get("web.reload", False)
-            )
-            
-            self.server = uvicorn.Server(config)
-            
-            logger.info(f"Starting web application at http{'s' if config.ssl_keyfile else ''}://{host}:{port}")
-            
-            # Run in a task to avoid blocking
-            server_task = asyncio.create_task(self.server.serve())
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to start web application: {e}")
-            return False
-    
-    async def shutdown(self):
-        """Shutdown the web application server"""
-        if self.server:
-            logger.info("Shutting down web application")
-            self.server.should_exit = True
-            await self.server.shutdown()
+# Create FastAPI application
+app = FastAPI(
+    title="ScaleTent API",
+    description="API for ScaleTent Meet & Greet System",
+    version="1.0.0",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json"
+)
 
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-def create_app(config: Config) -> FastAPI:
-    """Create and configure the FastAPI application."""
-    web_app = WebApp(config)
-    return web_app.app
+# Get base directory
+base_dir = Path(__file__).parent
 
+# Set up static files
+app.mount(
+    "/static",
+    StaticFiles(directory=str(base_dir / "static")),
+    name="static"
+)
+
+# Set up templates
+templates = Jinja2Templates(directory=str(base_dir / "templates"))
+
+# Include API routes under /api prefix
+app.include_router(api_router, prefix="/api")
+
+# Mock data for development
+MOCK_DATA = {
+    "status": {
+        "total_visitors": 150,
+        "known_faces": 75,
+        "active_cameras": 3,
+        "processing_fps": 25.5
+    },
+    "detections": {
+        "latest": [
+            {
+                "timestamp": "2024-03-14T12:00:00Z",
+                "camera_id": "cam1",
+                "person_data": {"name": "John Doe"}
+            }
+        ]
+    },
+    "cameras": {
+        "cam1": {"id": "cam1", "name": "Main Entrance", "running": True},
+        "cam2": {"id": "cam2", "name": "Side Door", "running": False}
+    }
+}
+
+# API endpoints for development
+@app.get("/api/status")
+async def get_status():
+    """Get system status"""
+    return MOCK_DATA["status"]
+
+@app.get("/api/detections/latest")
+async def get_latest_detections():
+    """Get latest detections"""
+    return MOCK_DATA["detections"]
+
+@app.get("/api/cameras")
+async def get_cameras():
+    """Get camera list"""
+    return {"cameras": MOCK_DATA["cameras"]}
+
+# Web routes
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    """Main dashboard page"""
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "title": "ScaleTent Dashboard"
+        }
+    )
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy"}
+
+@app.get("/cameras", response_class=HTMLResponse)
+async def cameras(request: Request):
+    """Cameras page"""
+    return templates.TemplateResponse(
+        "cameras.html",
+        {
+            "request": request,
+            "title": "Camera Feeds"
+        }
+    )
+
+@app.get("/analytics", response_class=HTMLResponse)
+async def analytics(request: Request):
+    """Analytics page"""
+    return templates.TemplateResponse(
+        "analytics.html",
+        {
+            "request": request,
+            "title": "Detection Analytics"
+        }
+    )
+
+@app.get("/profiles", response_class=HTMLResponse)
+async def profiles(request: Request):
+    """Profiles management page"""
+    return templates.TemplateResponse(
+        "profiles.html",
+        {
+            "request": request,
+            "title": "Profile Management"
+        }
+    )
+
+@app.get("/settings", response_class=HTMLResponse)
+async def settings(request: Request):
+    """Settings page"""
+    return templates.TemplateResponse(
+        "settings.html",
+        {
+            "request": request,
+            "title": "System Settings"
+        }
+    )
+
+# Error handlers
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Handle HTTP exceptions"""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": exc.detail,
+            "status_code": exc.status_code
+        }
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Handle general exceptions"""
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "status_code": 500
+        }
+    )
 
 if __name__ == "__main__":
-    # Load configuration from environment or file
-    config_data = {
-        "web": {
-            "host": os.getenv("WEB_HOST", "localhost"),
-            "port": int(os.getenv("WEB_PORT", 8000)),
-            "reload": os.getenv("WEB_RELOAD", "false").lower() == "true"
-        },
-        "ssl": {
-            "keyfile": os.getenv("SSL_KEYFILE"),
-            "certfile": os.getenv("SSL_CERTFILE")
-        }
-    }
-    config = Config(**config_data)
-    app = create_app(config)
+    # Configure SSL if needed
+    if not configure_ssl():
+        logger.warning("Failed to configure SSL certificates")
     
+    # Load configuration from environment
+    host = os.getenv("WEB_HOST", "0.0.0.0")
+    port = int(os.getenv("WEB_PORT", 8000))
+    reload = os.getenv("WEB_RELOAD", "true").lower() == "true"
+    
+    # Run the application
     uvicorn.run(
-        app,
-        host=config.get("web.host"),
-        port=config.get("web.port"),
-        ssl_keyfile=config.get("ssl.keyfile"),
-        ssl_certfile=config.get("ssl.certfile"),
-        reload=config.get("web.reload", False)
+        "src.web.app:app",
+        host=host,
+        port=port,
+        reload=reload,
+        log_level="info"
     )

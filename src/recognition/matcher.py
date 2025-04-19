@@ -13,6 +13,7 @@ from facenet_pytorch import InceptionResnetV1
 from PIL import Image
 
 from src.core.logger import setup_logger
+from src.core.device import get_device_from_config
 
 logger = setup_logger(__name__)
 
@@ -24,7 +25,7 @@ class FaceMatcher:
         embedder_model_path: str,
         database_path: str,
         similarity_threshold: float = 0.7,
-        device: str = 'cuda:0'
+        device: str = 'auto'
     ):
         """
         Initialize face matcher
@@ -33,11 +34,16 @@ class FaceMatcher:
             embedder_model_path (str): Path to FaceNet model weights
             database_path (str): Path to face embeddings database
             similarity_threshold (float): Threshold for face similarity (0-1)
-            device (str): Device to run inference on ('cuda:0', 'cpu', etc.)
+            device (str): Device to run inference on ('auto', 'cuda', 'mps', 'cpu')
         """
         self.database_path = Path(database_path)
         self.similarity_threshold = similarity_threshold
-        self.device = device
+        
+        # Determine device
+        if device == 'auto':
+            self.device = get_device_from_config('auto')
+        else:
+            self.device = torch.device(device)
         
         # Initialize embedder
         self._load_embedder(embedder_model_path)
@@ -52,7 +58,7 @@ class FaceMatcher:
         self.max_times = 100
         
         logger.info(f"Face matcher initialized with database: {database_path}")
-        logger.info(f"Running on device: {device}")
+        logger.info(f"Running on device: {self.device}")
         logger.info(f"Similarity threshold: {similarity_threshold}")
         logger.info(f"Known faces in database: {len(self.known_embeddings)}")
     
@@ -60,15 +66,21 @@ class FaceMatcher:
         """Load the FaceNet model"""
         try:
             logger.info("Loading FaceNet model")
-            self.embedder = InceptionResnetV1(
-                pretrained='vggface2',
-                device=self.device
-            ).eval()
             
-            if self.device.startswith('cuda') and not torch.cuda.is_available():
-                logger.warning("CUDA requested but not available. Falling back to CPU.")
-                self.device = 'cpu'
-                self.embedder = self.embedder.to('cpu')
+            # First try to load model on specified device
+            try:
+                self.embedder = InceptionResnetV1(
+                    pretrained='vggface2',
+                    device=self.device
+                ).eval()
+            except (RuntimeError, AssertionError) as e:
+                # If loading on specified device fails, fall back to CPU
+                logger.warning(f"Failed to load model on {self.device}, falling back to CPU: {str(e)}")
+                self.device = torch.device('cpu')
+                self.embedder = InceptionResnetV1(
+                    pretrained='vggface2',
+                    device=self.device
+                ).eval()
             
             logger.info("FaceNet model loaded successfully")
             

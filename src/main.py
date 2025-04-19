@@ -10,19 +10,22 @@ import os
 import signal
 import sys
 import yaml
-from pathlib import Path
 import logging
+from pathlib import Path
+import uvicorn
+from contextlib import asynccontextmanager
 
-from core.config import Config
-from core.logger import setup_logger
-from detection.detector import YOLODetector
-from recognition.face_detector import FaceDetector
-from recognition.matcher import FaceMatcher
-from streaming.publisher import StreamPublisher
-from core.camera import CameraManager
-from api.websocket import WebSocketServer
-from web.app import create_app
-from utils.ssl_utils import configure_ssl
+from src.core.config import Config
+from src.core.logger import setup_logger
+from src.core.device import get_device_from_config
+from src.detection.detector import YOLODetector
+from src.recognition.face_detector import FaceDetector
+from src.recognition.matcher import FaceMatcher
+from src.streaming.publisher import StreamPublisher
+from src.core.camera import CameraManager
+from src.api.websocket import WebSocketServer
+from src.web.app import create_app
+from src.utils.ssl_utils import configure_ssl
 
 # Configure logging
 logging.basicConfig(
@@ -56,10 +59,6 @@ async def shutdown(signal, loop, app_components):
     if 'websocket_server' in app_components:
         logger.info("Stopping WebSocket server...")
         await app_components['websocket_server'].stop()
-    
-    if 'web_app' in app_components:
-        logger.info("Stopping web application...")
-        await app_components['web_app'].shutdown()
     
     # Cancel tasks
     tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
@@ -100,12 +99,17 @@ async def run_application(config_path: str, debug: bool = False) -> int:
         app_components = {}
         
         try:
+            # Get device configuration
+            device = get_device_from_config(config['system']['device']['type'])
+            logger.info(f"Using device: {device}")
+            
             # Initialize detection components
             logger.info("Initializing YOLOv8 detector...")
             detector = YOLODetector(
-                model_path=config.get('detection.model_path'),
-                confidence_threshold=config.get('detection.confidence_threshold', 0.5),
-                device=config.get('detection.device', 'cuda:0')
+                model_path=config['detection']['model']['path'],
+                confidence_threshold=config['detection']['model']['confidence'],
+                device=str(device),
+                classes=config['detection']['model']['classes']
             )
             app_components['detector'] = detector
             
@@ -116,10 +120,12 @@ async def run_application(config_path: str, debug: bool = False) -> int:
                 confidence_threshold=config.get('recognition.face_detection_threshold', 0.5)
             )
             
+            # Initialize face matcher with device configuration
             face_matcher = FaceMatcher(
                 embedder_model_path=config.get('recognition.embedder_model'),
                 database_path=config.get('recognition.database_path'),
-                similarity_threshold=config.get('recognition.similarity_threshold', 0.7)
+                similarity_threshold=config.get('recognition.similarity_threshold', 0.7),
+                device=str(device)  # Pass the device configuration to FaceMatcher
             )
             
             app_components['face_detector'] = face_detector
@@ -150,11 +156,6 @@ async def run_application(config_path: str, debug: bool = False) -> int:
             )
             app_components['websocket_server'] = websocket_server
             
-            # Initialize web application
-            logger.info("Initializing web application...")
-            web_app = create_app(config)
-            app_components['web_app'] = web_app
-            
             # Start components
             logger.info("Starting camera manager...")
             await camera_manager.start()
@@ -162,10 +163,9 @@ async def run_application(config_path: str, debug: bool = False) -> int:
             logger.info("Starting WebSocket server...")
             await websocket_server.start()
             
+            # Initialize and start web application
             logger.info("Starting web application...")
-            await web_app.start()
-            
-            logger.info("ScaleTent system is running. Press Ctrl+C to exit.")
+            app = create_app(config)
             
             # Set up signal handlers for graceful shutdown
             loop = asyncio.get_running_loop()
@@ -175,9 +175,18 @@ async def run_application(config_path: str, debug: bool = False) -> int:
                     s, lambda s=s: asyncio.create_task(shutdown(s, loop, app_components))
                 )
             
-            # Keep the main task running
-            while True:
-                await asyncio.sleep(1)
+            # Start FastAPI application with uvicorn
+            config = uvicorn.Config(
+                app=app,
+                host=config.get('web.host', '0.0.0.0'),
+                port=config.get('web.port', 5000),
+                reload=debug,
+                log_level="debug" if debug else "info"
+            )
+            server = uvicorn.Server(config)
+            await server.serve()
+            
+            return 0
             
         except Exception as e:
             logger.error(f"Error in main application: {e}", exc_info=True)
@@ -191,18 +200,8 @@ async def run_application(config_path: str, debug: bool = False) -> int:
         logger.error(f"Failed to start application: {e}")
         return 1
 
-def main():
-    """Main entry point of the application."""
-    # Configure SSL certificates
-    if not configure_ssl():
-        logger.error("Failed to configure SSL certificates. Application may experience network issues.")
-    
-    # Rest of your application initialization code here
-    logger.info("Starting Scaletent application...")
-
 if __name__ == "__main__":
     args = parse_arguments()
-    
     try:
         exit_code = asyncio.run(run_application(args.config, args.debug))
         sys.exit(exit_code)

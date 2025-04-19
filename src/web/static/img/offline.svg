@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="640" height="360" version="1.1" viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg">
+ <rect width="640" height="360" fill="#1a1a1a"/>
+ <g fill="none" stroke="#666" stroke-linecap="round" stroke-width="4">
+  <path d="m320 140v80"/>
+  <path d="m280 180h80"/>
+ </g>
+ <text x="320" y="280" fill="#666" font-family="sans-serif" font-size="24px" text-anchor="middle">Camera Offline</text>
+</svg> 

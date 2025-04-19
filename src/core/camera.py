@@ -10,7 +10,7 @@ import threading
 from pathlib import Path
 import queue
 
-from core.logger import setup_logger
+from src.core.logger import setup_logger
 
 logger = setup_logger(__name__)
 

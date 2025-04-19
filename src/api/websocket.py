@@ -8,7 +8,7 @@ import websockets
 from typing import Set, Dict, Any
 from datetime import datetime
 
-from core.logger import setup_logger
+from src.core.logger import setup_logger
 
 logger = setup_logger(__name__)
 

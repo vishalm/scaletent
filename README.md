@@ -631,3 +631,266 @@ ScaleTent is licensed under the MIT License - see the [LICENSE](LICENSE) file fo
 ## Contact
 
 For questions and support, please open an issue on our GitHub repository or contact the maintainers at support@scaletent-example.com.
+
+## Prerequisites
+
+- Python 3.10 or higher
+- Docker and Docker Compose
+- pip (Python package installer)
+- Git
+- Apple Silicon Mac (M1/M2/M3) for MPS acceleration
+
+## Local Development Setup
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/yourusername/scaletent.git
+cd scaletent
+```
+
+### 2. Create and Activate Virtual Environment
+
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+source venv/bin/activate  # On Unix/macOS
+```
+
+### 3. Install Dependencies
+
+```bash
+# Install Python dependencies
+pip install -r requirements.apple-silicon.txt
+```
+
+### 4. Start Redis and MongoDB with Docker
+
+Create a `docker-compose.services.yml` file:
+
+```yaml
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mongodb:
+    image: mongodb/mongodb-community-server:7.0-ubi8
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGODB_INITDB_ROOT_USERNAME=admin
+      - MONGODB_INITDB_ROOT_PASSWORD=password
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis_data:
+  mongodb_data:
+```
+
+Start the services:
+
+```bash
+docker-compose -f docker-compose.services.yml up -d
+```
+
+### 5. Configure Environment Variables
+
+Create a `.env` file:
+
+```env
+# Application
+APP_NAME=ScaleTent
+APP_VERSION=0.1.0
+DEBUG=true
+DEVICE_TYPE=mps
+
+# Web Server
+WEB_HOST=localhost
+WEB_PORT=8000
+WEB_RELOAD=true
+
+# API Security
+API_KEY=your_secure_api_key_here
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_DB=0
+
+# MongoDB
+MONGODB_URI=mongodb://admin:password@localhost:27017
+MONGODB_DB=scaletent
+
+# Storage
+STORAGE_PATH=data/storage
+MODELS_PATH=data/models
+EXPORT_PATH=data/exports
+
+# Face Recognition
+FACE_DETECTION_CONFIDENCE=0.5
+FACE_RECOGNITION_THRESHOLD=0.7
+FACE_EMBEDDER_MODEL=facenet
+```
+
+### 6. Create Required Directories
+
+```bash
+mkdir -p data/{storage,models,exports,logs}
+```
+
+### 7. Download Required Models
+
+```bash
+# Create models directory if not exists
+mkdir -p data/models
+
+# Download FaceNet model (if not using pretrained)
+# The system will use pretrained models by default
+# If you want to use custom models, place them in data/models/
+```
+
+### 8. Start the Application
+
+Start each component in a separate terminal window:
+
+```bash
+# Terminal 1: Start Redis and MongoDB (if not already running)
+docker-compose -f docker-compose.services.yml up -d
+
+# Terminal 2: Start the main application
+source venv/bin/activate
+python src/main.py
+
+# Terminal 3: Start the web interface
+source venv/bin/activate
+python src/web/app.py
+```
+
+The application will be available at:
+- Web Interface: http://localhost:8000
+- API Documentation: http://localhost:8000/api/docs
+- ReDoc API Documentation: http://localhost:8000/api/redoc
+
+## Accessing the Application
+
+### Web Interface
+- Open http://localhost:8000 in your browser
+- Navigate through the dashboard, cameras, analytics, and profiles sections
+
+### API Access
+- API documentation is available at http://localhost:8000/api/docs
+- Use the API key specified in your .env file for authenticated endpoints
+- Test the API using curl or Postman:
+  ```bash
+  # Example: Get system status
+  curl http://localhost:8000/api/status
+  
+  # Example: Get cameras (with API key)
+  curl -H "X-API-Key: your_secure_api_key_here" http://localhost:8000/api/cameras
+  ```
+
+## Monitoring
+
+### Logs
+Application logs are stored in `data/logs/`:
+```bash
+# View main application logs
+tail -f data/logs/app.log
+
+# View web interface logs
+tail -f data/logs/web.log
+```
+
+### Docker Services
+Monitor Redis and MongoDB:
+```bash
+# Check service status
+docker-compose -f docker-compose.services.yml ps
+
+# View service logs
+docker-compose -f docker-compose.services.yml logs -f
+
+# Redis CLI access
+docker exec -it scaletent-redis-1 redis-cli
+
+# MongoDB shell access
+docker exec -it scaletent-mongodb-1 mongosh -u admin -p password
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Port Conflicts**
+   ```bash
+   # Check if ports are in use
+   lsof -i :8000  # Web port
+   lsof -i :6379  # Redis port
+   lsof -i :27017 # MongoDB port
+   ```
+
+2. **Database Connection Issues**
+   ```bash
+   # Test Redis connection
+   redis-cli ping
+   
+   # Test MongoDB connection
+   mongosh mongodb://admin:password@localhost:27017
+   ```
+
+3. **MPS Device Issues**
+   ```python
+   # Test PyTorch MPS availability
+   python -c "import torch; print(torch.backends.mps.is_available())"
+   ```
+
+### Error Resolution
+
+1. **Application won't start**
+   - Check if all required directories exist
+   - Verify environment variables in .env
+   - Ensure virtual environment is activated
+   - Check logs for specific errors
+
+2. **Database errors**
+   - Ensure Docker services are running
+   - Check connection strings in .env
+   - Verify port availability
+
+3. **Model loading errors**
+   - Verify model files in data/models/
+   - Check PyTorch version compatibility
+   - Ensure sufficient disk space
+
+## Stopping the Application
+
+```bash
+# Stop the web interface and main application
+# Press Ctrl+C in their respective terminals
+
+# Stop Docker services
+docker-compose -f docker-compose.services.yml down
+
+# Optionally, remove volumes
+docker-compose -f docker-compose.services.yml down -v
+```
