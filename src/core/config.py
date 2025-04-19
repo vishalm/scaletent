@@ -7,6 +7,7 @@ import yaml
 from typing import Any, Dict, List, Optional
 from src.core.logger import setup_logger
 from src.core.config_db import ConfigDB
+from pathlib import Path
 
 logger = setup_logger(__name__)
 
@@ -28,7 +29,8 @@ class Config:
             'track_metrics': True,
             'save_debug_frames': False,
             'max_faces': 10,
-            'performance_mode': 'balanced'  # balanced, speed, or accuracy
+            'performance_mode': 'balanced',
+            'batch_size': 4
         },
         'recognition': {
             'similarity_threshold': 0.6,
@@ -41,11 +43,13 @@ class Config:
         },
         'api': {
             'host': '0.0.0.0',
-            'port': 5000,
+            'port': 8000,
             'workers': 1,
             'enable_docs': True,
             'cors_origins': ['*'],
-            'rate_limit': 100  # requests per minute
+            'rate_limit': 100,  # requests per minute
+            'debug': False,
+            'api_key': None
         },
         'metrics': {
             'enabled': True,
@@ -70,48 +74,14 @@ class Config:
     }
     
     DEFAULT_CAMERA = {
-        'id': 'mac-builtin',
+        'id': 'mac-camera',
         'name': 'Mac Built-in Camera',
         'source': '0',  # Use 0 for built-in camera
         'width': 1280,
         'height': 720,
         'fps': 30,
         'processing_fps': 15,
-        'enabled': True,
-        'auto_reconnect': True,
-        'reconnect_delay': 5,  # seconds
-        'metrics': {
-            'track_fps': True,
-            'track_latency': True,
-            'track_detection_counts': True,
-            'track_recognition_scores': True,
-            'track_memory_usage': True,
-            'track_cpu_usage': True,
-            'track_queue_size': True,
-            'track_error_rates': True
-        },
-        'advanced': {
-            'exposure': 'auto',
-            'white_balance': 'auto',
-            'brightness': 50,
-            'contrast': 50,
-            'saturation': 50,
-            'sharpness': 50,
-            'focus': 'auto'
-        },
-        'recording': {
-            'enabled': False,
-            'format': 'mp4',
-            'quality': 'high',
-            'segment_duration': 600,  # 10 minutes
-            'max_segments': 144  # 24 hours worth
-        },
-        'alerts': {
-            'on_face_detected': False,
-            'on_recognition': False,
-            'on_error': True,
-            'on_performance_issue': True
-        }
+        'enabled': True
     }
     
     REQUIRED_CAMERA_FIELDS = ['id', 'source', 'width', 'height', 'fps']
@@ -137,7 +107,18 @@ class Config:
     def __init__(self, config_path: str = "config/config.yaml"):
         """Initialize configuration"""
         self.config_path = config_path
-        self.db = ConfigDB()
+        
+        # Setup database path
+        data_dir = Path("data")
+        data_dir.mkdir(exist_ok=True)
+        db_dir = data_dir / "db"
+        db_dir.mkdir(exist_ok=True)
+        db_path = db_dir / "config.db"
+        
+        # Initialize config database
+        self.db = ConfigDB(str(db_path))
+        
+        # Initialize configuration
         self._init_defaults()
         self._migrate_yaml_to_db()
         self._ensure_default_camera()
@@ -147,10 +128,10 @@ class Config:
         """Initialize default configuration values"""
         try:
             for section, values in self.DEFAULT_CONFIG.items():
-                current = self.db.get_section(section)
+                current = self.db.get_section(section) or {}
                 for key, value in values.items():
                     if key not in current:
-                        self.db.set_value(section, key, value)
+                        self.db.set(section, key, value)
             logger.debug("Default configuration initialized")
         except Exception as e:
             logger.error(f"Error initializing defaults: {e}")
@@ -158,15 +139,18 @@ class Config:
     def _ensure_default_camera(self):
         """Ensure default camera configuration exists"""
         try:
-            existing_camera = self.get_camera(self.DEFAULT_CAMERA['id'])
+            existing_camera = self.db.get_camera(self.DEFAULT_CAMERA['id'])
             if not existing_camera:
                 logger.info("Adding default camera configuration")
-                self.add_camera(self.DEFAULT_CAMERA)
+                self.db.add_camera(self.DEFAULT_CAMERA)
             else:
                 # Update with any new default fields while preserving existing values
                 updated_config = self.DEFAULT_CAMERA.copy()
-                updated_config.update(existing_camera)
-                self.update_camera(self.DEFAULT_CAMERA['id'], updated_config)
+                for key, value in existing_camera.items():
+                    if value is not None:  # Only update if value exists
+                        updated_config[key] = value
+                self.db.update_camera(self.DEFAULT_CAMERA['id'], updated_config)
+                logger.debug(f"Updated default camera configuration: {updated_config}")
         except Exception as e:
             logger.error(f"Error ensuring default camera: {e}")
     
@@ -194,16 +178,16 @@ class Config:
                     for section, values in yaml_config.items():
                         if isinstance(values, dict):
                             for key, value in values.items():
-                                self.db.set_value(section, key, value)
+                                self.db.set(section, key, value)
                         else:
-                            self.db.set_value('general', section, values)
+                            self.db.set('general', section, values)
                     
                     # Migrate cameras if present
                     cameras = yaml_config.get('cameras', [])
                     if isinstance(cameras, list):
                         for camera in cameras:
                             if isinstance(camera, dict) and 'id' in camera:
-                                self.add_camera(camera)  # Use add_camera for validation
+                                self.db.add_camera(camera)
                     
                     logger.info("Migrated YAML configuration to SQLite")
                     
@@ -244,52 +228,24 @@ class Config:
                     return False
             
             # Validate numeric fields
-            if not isinstance(camera['width'], int) or camera['width'] <= 0:
+            if not isinstance(camera.get('width'), int) or camera.get('width', 0) <= 0:
                 logger.error("Invalid camera width")
                 return False
-            if not isinstance(camera['height'], int) or camera['height'] <= 0:
+            if not isinstance(camera.get('height'), int) or camera.get('height', 0) <= 0:
                 logger.error("Invalid camera height")
                 return False
-            if not isinstance(camera['fps'], int) or camera['fps'] <= 0:
+            if not isinstance(camera.get('fps'), int) or camera.get('fps', 0) <= 0:
                 logger.error("Invalid camera fps")
                 return False
             
-            # Validate processing_fps
+            # Validate processing_fps if present
             if 'processing_fps' in camera:
                 if not isinstance(camera['processing_fps'], int) or camera['processing_fps'] <= 0:
                     logger.error("Invalid processing_fps")
                     return False
-                if camera['processing_fps'] > camera['fps']:
-                    logger.error("processing_fps cannot be greater than fps")
-                    return False
-            
-            # Validate metrics configuration if present
-            if 'metrics' in camera:
-                if not isinstance(camera['metrics'], dict):
-                    logger.error("Invalid metrics configuration")
-                    return False
-            
-            # Validate advanced settings if present
-            if 'advanced' in camera:
-                if not isinstance(camera['advanced'], dict):
-                    logger.error("Invalid advanced settings")
-                    return False
-                for key in ['brightness', 'contrast', 'saturation', 'sharpness']:
-                    if key in camera['advanced']:
-                        value = camera['advanced'][key]
-                        if not isinstance(value, (int, float)) or value < 0 or value > 100:
-                            logger.error(f"Invalid {key} value")
-                            return False
-            
-            # Validate recording settings if present
-            if 'recording' in camera:
-                if not isinstance(camera['recording'], dict):
-                    logger.error("Invalid recording settings")
-                    return False
-                if 'segment_duration' in camera['recording']:
-                    if not isinstance(camera['recording']['segment_duration'], int) or camera['recording']['segment_duration'] <= 0:
-                        logger.error("Invalid segment duration")
-                        return False
+                if camera['processing_fps'] > camera.get('fps', 30):
+                    logger.warning("processing_fps is greater than fps, setting to fps value")
+                    camera['processing_fps'] = camera['fps']
             
             return True
         except Exception as e:
@@ -300,11 +256,11 @@ class Config:
         """Get configuration value"""
         if key is None:
             return self.db.get_section(section)
-        return self.db.get_value(section, key, default)
+        return self.db.get(section, key, default)
     
     def set(self, section: str, key: str, value: Any):
         """Set configuration value"""
-        self.db.set_value(section, key, value)
+        self.db.set(section, key, value)
     
     def get_all(self) -> Dict[str, Any]:
         """Get all configuration values"""
@@ -312,15 +268,44 @@ class Config:
     
     def add_camera(self, camera: Dict[str, Any]) -> bool:
         """Add a camera configuration"""
-        if not self.validate_camera_config(camera):
+        try:
+            # Ensure all required fields are present
+            camera_config = self.DEFAULT_CAMERA.copy()
+            camera_config.update(camera)
+            
+            if not self.validate_camera_config(camera_config):
+                return False
+                
+            success = self.db.add_camera(camera_config)
+            if success:
+                logger.info(f"Added camera configuration: {camera_config['id']}")
+            return success
+        except Exception as e:
+            logger.error(f"Error adding camera: {e}")
             return False
-        return self.db.add_camera(camera)
     
     def update_camera(self, camera_id: str, camera: Dict[str, Any]) -> bool:
         """Update a camera configuration"""
-        if not self.validate_camera_config(camera):
+        try:
+            existing_camera = self.db.get_camera(camera_id)
+            if not existing_camera:
+                logger.error(f"Camera not found: {camera_id}")
+                return False
+            
+            # Merge with existing configuration
+            updated_config = existing_camera.copy()
+            updated_config.update(camera)
+            
+            if not self.validate_camera_config(updated_config):
+                return False
+                
+            success = self.db.update_camera(camera_id, updated_config)
+            if success:
+                logger.info(f"Updated camera configuration: {camera_id}")
+            return success
+        except Exception as e:
+            logger.error(f"Error updating camera: {e}")
             return False
-        return self.db.update_camera(camera_id, camera)
     
     def delete_camera(self, camera_id: str) -> bool:
         """Delete a camera configuration"""
@@ -328,11 +313,31 @@ class Config:
     
     def get_camera(self, camera_id: str) -> Optional[Dict[str, Any]]:
         """Get a camera configuration"""
-        return self.db.get_camera(camera_id)
+        try:
+            camera = self.db.get_camera(camera_id)
+            if camera:
+                # Ensure all default fields are present
+                default_config = self.DEFAULT_CAMERA.copy()
+                default_config.update(camera)
+                return default_config
+            return None
+        except Exception as e:
+            logger.error(f"Error getting camera: {e}")
+            return None
     
     def get_cameras(self) -> List[Dict[str, Any]]:
         """Get all camera configurations"""
-        return self.db.get_cameras()
+        try:
+            cameras = self.db.get_cameras()
+            # Ensure all default fields are present for each camera
+            for camera in cameras:
+                default_config = self.DEFAULT_CAMERA.copy()
+                default_config.update(camera)
+                camera.update(default_config)
+            return cameras
+        except Exception as e:
+            logger.error(f"Error getting cameras: {e}")
+            return []
     
     def close(self):
         """Close database connection"""

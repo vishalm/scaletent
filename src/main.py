@@ -173,6 +173,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files and templates
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+# Create required directories
+static_dir = Path("src/web/static")
+templates_dir = Path("src/web/templates")
+static_dir.mkdir(parents=True, exist_ok=True)
+templates_dir.mkdir(parents=True, exist_ok=True)
+
+# Mount static files
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+# Initialize templates
+templates = Jinja2Templates(directory=str(templates_dir))
+
+# Web interface routes
+from fastapi import Request
+
+@app.get("/", include_in_schema=False)
+@app.head("/", include_in_schema=False)
+async def root(request: Request):
+    """Root endpoint that serves the web interface"""
+    return templates.TemplateResponse("index.html", {"request": request})
+
 # Include API routes
 app.include_router(api_router)
 

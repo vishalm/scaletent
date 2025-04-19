@@ -235,7 +235,7 @@ main() {
     start_in_terminal "ScaleTent Web Interface" "uvicorn src.web.app:app --host 0.0.0.0 --port 8000 --reload"
     start_in_terminal "ScaleTent API Server" "uvicorn src.main:app --host 0.0.0.0 --port 5000 --reload"
     # start_in_terminal "ScaleTent Camera Demo" "export OPENCV_AVFOUNDATION_SKIP_AUTH=1 && python run_local.py"
-    start_in_terminal "ScaleTent Camera Demo" "env OPENCV_AVFOUNDATION_SKIP_AUTH=1 python run_local.py"
+    start_in_terminal "ScaleTent Camera Demo" "env OPENCV_AVFOUNDATION_SKIP_AUTH=0 python run_local.py"
     
     # Create stop script
     create_stop_script

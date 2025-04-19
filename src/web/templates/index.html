@@ -1,218 +1,298 @@
-{% extends "base.html" %}
-
-{% block extra_css %}
-<style>
-    .metric-card {
-        transition: transform 0.2s;
-    }
-    .metric-card:hover {
-        transform: translateY(-5px);
-    }
-    .camera-feed {
-        aspect-ratio: 16/9;
-        background: #000;
-        border-radius: 8px;
-        overflow: hidden;
-    }
-    .camera-feed img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-</style>
-{% endblock %}
-
-{% block content %}
-<div class="row mb-4">
-    <div class="col">
-        <h1 class="h3 mb-4">Dashboard</h1>
-    </div>
-</div>
-
-<!-- Key Metrics -->
-<div class="row g-4 mb-4">
-    <div class="col-md-3">
-        <div class="card metric-card h-100 border-0 shadow-sm">
-            <div class="card-body">
-                <div class="d-flex align-items-center mb-3">
-                    <div class="bg-primary bg-opacity-10 p-3 rounded-3 me-3">
-                        <i class="fas fa-users fa-lg text-primary"></i>
-                    </div>
-                    <h6 class="card-title mb-0">Total Visitors</h6>
-                </div>
-                <h2 class="mb-0" id="total-visitors">0</h2>
-                <small class="text-muted">Today</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card metric-card h-100 border-0 shadow-sm">
-            <div class="card-body">
-                <div class="d-flex align-items-center mb-3">
-                    <div class="bg-success bg-opacity-10 p-3 rounded-3 me-3">
-                        <i class="fas fa-user-check fa-lg text-success"></i>
-                    </div>
-                    <h6 class="card-title mb-0">Known Faces</h6>
-                </div>
-                <h2 class="mb-0" id="known-faces">0</h2>
-                <small class="text-muted">Recognized today</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card metric-card h-100 border-0 shadow-sm">
-            <div class="card-body">
-                <div class="d-flex align-items-center mb-3">
-                    <div class="bg-warning bg-opacity-10 p-3 rounded-3 me-3">
-                        <i class="fas fa-camera fa-lg text-warning"></i>
-                    </div>
-                    <h6 class="card-title mb-0">Active Cameras</h6>
-                </div>
-                <h2 class="mb-0" id="active-cameras">0</h2>
-                <small class="text-muted">Online now</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card metric-card h-100 border-0 shadow-sm">
-            <div class="card-body">
-                <div class="d-flex align-items-center mb-3">
-                    <div class="bg-info bg-opacity-10 p-3 rounded-3 me-3">
-                        <i class="fas fa-tachometer-alt fa-lg text-info"></i>
-                    </div>
-                    <h6 class="card-title mb-0">Processing Speed</h6>
-                </div>
-                <h2 class="mb-0" id="processing-speed">0</h2>
-                <small class="text-muted">FPS</small>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Recent Activity & Live Feeds -->
-<div class="row g-4">
-    <!-- Recent Activity -->
-    <div class="col-lg-4">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-transparent border-0">
-                <h5 class="mb-0">Recent Activity</h5>
-            </div>
-            <div class="card-body p-0">
-                <div class="list-group list-group-flush" id="activity-feed">
-                    <!-- Activity items will be dynamically added here -->
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Live Camera Feeds -->
-    <div class="col-lg-8">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Live Camera Feeds</h5>
-                <a href="/cameras" class="btn btn-sm btn-primary">
-                    <i class="fas fa-external-link-alt me-1"></i>View All
-                </a>
-            </div>
-            <div class="card-body">
-                <div class="row g-4" id="camera-feeds">
-                    <!-- Camera feeds will be dynamically added here -->
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Function to update metrics
-    async function updateMetrics() {
-        try {
-            const response = await fetch('/api/status');
-            const data = await response.json();
-            
-            // Update metrics
-            document.getElementById('total-visitors').textContent = data.total_visitors || 0;
-            document.getElementById('known-faces').textContent = data.known_faces || 0;
-            document.getElementById('active-cameras').textContent = data.active_cameras || 0;
-            document.getElementById('processing-speed').textContent = data.processing_fps?.toFixed(1) || 0;
-        } catch (error) {
-            console.error('Error updating metrics:', error);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScaleTent - Face Recognition</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .camera-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: #1a1a1a;
+            border-radius: 8px;
+            overflow: hidden;
         }
-    }
+        .camera-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .camera-offline {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #666;
+        }
+        .camera-offline i {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .camera-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 1rem;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .config-form label {
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">ScaleTent</a>
+        </div>
+    </nav>
 
-    // Function to update activity feed
-    async function updateActivityFeed() {
-        try {
-            const response = await fetch('/api/detections/latest');
-            const data = await response.json();
-            
-            const activityFeed = document.getElementById('activity-feed');
-            activityFeed.innerHTML = ''; // Clear existing items
-            
-            // Add new items
-            data.detections?.forEach(detection => {
-                const time = new Date(data.timestamp).toLocaleTimeString();
-                const item = document.createElement('div');
-                item.className = 'list-group-item';
-                item.innerHTML = `
-                    <div class="d-flex align-items-center">
-                        <div class="me-3">
-                            <i class="fas fa-user-circle fa-2x text-muted"></i>
-                        </div>
-                        <div>
-                            <p class="mb-0">${detection.person_data?.name || 'Unknown Person'}</p>
-                            <small class="text-muted">${time} - Camera ${data.camera_id}</small>
+    <div class="container py-4">
+        <div class="row">
+            <div class="col-12 col-lg-8">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="mb-0">Camera Feed</h2>
+                    <div>
+                        <button id="startBtn" class="btn btn-success me-2" disabled>
+                            <i class="fas fa-play me-1"></i> Start
+                        </button>
+                        <button id="stopBtn" class="btn btn-danger" disabled>
+                            <i class="fas fa-stop me-1"></i> Stop
+                        </button>
+                    </div>
+                </div>
+
+                <div class="camera-container mb-4">
+                    <img id="cameraFeed" class="camera-feed" src="" alt="Camera Feed">
+                    <div id="offlineMessage" class="camera-offline">
+                        <i class="fas fa-video-slash"></i>
+                        <p>Camera is offline</p>
+                    </div>
+                    <div class="camera-controls">
+                        <div class="text-white">
+                            <h5 class="mb-0" id="cameraName">Camera Not Configured</h5>
+                            <small class="opacity-75" id="cameraResolution">Configure camera settings to start</small>
                         </div>
                     </div>
-                `;
-                activityFeed.appendChild(item);
-            });
-        } catch (error) {
-            console.error('Error updating activity feed:', error);
-        }
-    }
+                </div>
+            </div>
 
-    // Function to update camera feeds
-    async function updateCameraFeeds() {
-        try {
-            const response = await fetch('/api/cameras');
-            const data = await response.json();
-            
-            const cameraFeeds = document.getElementById('camera-feeds');
-            cameraFeeds.innerHTML = ''; // Clear existing feeds
-            
-            // Add camera feeds
-            Object.entries(data.cameras || {}).slice(0, 4).forEach(([id, camera]) => {
-                const col = document.createElement('div');
-                col.className = 'col-md-6';
-                col.innerHTML = `
-                    <div class="camera-feed">
-                        <img src="/api/cameras/${id}/snapshot" alt="Camera ${id}" 
-                             onerror="this.src='/static/img/offline.png'">
+            <div class="col-12 col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Camera Configuration</h5>
                     </div>
-                    <div class="mt-2">
-                        <h6 class="mb-0">Camera ${id}</h6>
-                        <small class="text-muted">${camera.running ? 'Online' : 'Offline'}</small>
+                    <div class="card-body">
+                        <form id="cameraConfigForm" class="config-form">
+                            <div class="mb-3">
+                                <label for="cameraId" class="form-label">Camera ID</label>
+                                <input type="text" class="form-control" id="cameraId" value="mac-camera" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label for="cameraName" class="form-label">Camera Name</label>
+                                <input type="text" class="form-control" id="cameraNameInput" value="Mac Built-in Camera" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="cameraSource" class="form-label">Camera Source</label>
+                                <input type="text" class="form-control" id="cameraSource" value="0" required>
+                                <small class="text-muted">Use "0" for built-in camera or device path (e.g., /dev/video0)</small>
+                            </div>
+                            <div class="row">
+                                <div class="col-6 mb-3">
+                                    <label for="cameraWidth" class="form-label">Width</label>
+                                    <input type="number" class="form-control" id="cameraWidth" value="1280" required>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="cameraHeight" class="form-label">Height</label>
+                                    <input type="number" class="form-control" id="cameraHeight" value="720" required>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-6 mb-3">
+                                    <label for="cameraFPS" class="form-label">FPS</label>
+                                    <input type="number" class="form-control" id="cameraFPS" value="30" required>
+                                </div>
+                                <div class="col-6 mb-3">
+                                    <label for="processingFPS" class="form-label">Processing FPS</label>
+                                    <input type="number" class="form-control" id="processingFPS" value="15" required>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="cameraEnabled" checked>
+                                    <label class="form-check-label" for="cameraEnabled">Enable Camera</label>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-save me-1"></i> Save Configuration
+                            </button>
+                        </form>
                     </div>
-                `;
-                cameraFeeds.appendChild(col);
-            });
-        } catch (error) {
-            console.error('Error updating camera feeds:', error);
-        }
-    }
+                </div>
+            </div>
+        </div>
+    </div>
 
-    // Update data periodically
-    updateMetrics();
-    updateActivityFeed();
-    updateCameraFeeds();
-    
-    setInterval(updateMetrics, 5000);
-    setInterval(updateActivityFeed, 2000);
-    setInterval(updateCameraFeeds, 1000);
-});
-</script>
-{% endblock %}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Camera ID - using the configured camera ID
+        const cameraId = 'mac-camera';
+        let isRunning = false;
+        let updateInterval = null;
+
+        // Function to update camera feed
+        async function updateCameraFeed() {
+            try {
+                const img = document.getElementById('cameraFeed');
+                const timestamp = new Date().getTime();
+                img.src = `/api/cameras/${cameraId}/snapshot?t=${timestamp}`;
+                document.getElementById('offlineMessage').style.display = 'none';
+            } catch (error) {
+                console.error('Error updating camera feed:', error);
+                document.getElementById('offlineMessage').style.display = 'block';
+            }
+        }
+
+        // Function to start camera
+        async function startCamera() {
+            try {
+                const response = await fetch(`/api/cameras/${cameraId}/start`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    isRunning = true;
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('stopBtn').disabled = false;
+                    updateInterval = setInterval(updateCameraFeed, 100);
+                }
+            } catch (error) {
+                console.error('Error starting camera:', error);
+            }
+        }
+
+        // Function to stop camera
+        async function stopCamera() {
+            try {
+                const response = await fetch(`/api/cameras/${cameraId}/stop`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    isRunning = false;
+                    document.getElementById('startBtn').disabled = false;
+                    document.getElementById('stopBtn').disabled = true;
+                    if (updateInterval) {
+                        clearInterval(updateInterval);
+                        updateInterval = null;
+                    }
+                    document.getElementById('offlineMessage').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error stopping camera:', error);
+            }
+        }
+
+        // Function to save camera configuration
+        async function saveCameraConfig(event) {
+            event.preventDefault();
+            
+            const config = {
+                id: document.getElementById('cameraId').value,
+                name: document.getElementById('cameraNameInput').value,
+                source: document.getElementById('cameraSource').value,
+                width: parseInt(document.getElementById('cameraWidth').value),
+                height: parseInt(document.getElementById('cameraHeight').value),
+                fps: parseInt(document.getElementById('cameraFPS').value),
+                processing_fps: parseInt(document.getElementById('processingFPS').value),
+                enabled: document.getElementById('cameraEnabled').checked
+            };
+
+            try {
+                const response = await fetch('/api/cameras', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                if (response.ok) {
+                    // Update UI elements
+                    document.getElementById('cameraName').textContent = config.name;
+                    document.getElementById('cameraResolution').textContent = 
+                        `${config.width}x${config.height} @ ${config.fps}fps`;
+                    
+                    // Enable camera controls if camera is enabled
+                    if (config.enabled) {
+                        document.getElementById('startBtn').disabled = false;
+                    }
+                    
+                    alert('Camera configuration saved successfully!');
+                } else {
+                    const error = await response.text();
+                    throw new Error(error);
+                }
+            } catch (error) {
+                console.error('Error saving camera configuration:', error);
+                alert('Failed to save camera configuration. Please check the console for details.');
+            }
+        }
+
+        // Add event listeners
+        document.getElementById('startBtn').addEventListener('click', startCamera);
+        document.getElementById('stopBtn').addEventListener('click', stopCamera);
+        document.getElementById('cameraConfigForm').addEventListener('submit', saveCameraConfig);
+
+        // Check initial camera status
+        fetch(`/api/cameras`)
+            .then(response => response.json())
+            .then(data => {
+                const camera = data.cameras[cameraId];
+                if (camera) {
+                    // Update form with existing configuration
+                    document.getElementById('cameraNameInput').value = camera.name || 'Mac Built-in Camera';
+                    document.getElementById('cameraSource').value = camera.source || '0';
+                    document.getElementById('cameraWidth').value = camera.width || 1280;
+                    document.getElementById('cameraHeight').value = camera.height || 720;
+                    document.getElementById('cameraFPS').value = camera.fps || 30;
+                    document.getElementById('processingFPS').value = camera.processing_fps || 15;
+                    document.getElementById('cameraEnabled').checked = camera.enabled !== false;
+
+                    // Update display
+                    document.getElementById('cameraName').textContent = camera.name || 'Mac Built-in Camera';
+                    document.getElementById('cameraResolution').textContent = 
+                        `${camera.width || 1280}x${camera.height || 720} @ ${camera.fps || 30}fps`;
+
+                    if (camera.running) {
+                        isRunning = true;
+                        document.getElementById('startBtn').disabled = true;
+                        document.getElementById('stopBtn').disabled = false;
+                        updateInterval = setInterval(updateCameraFeed, 100);
+                    } else {
+                        document.getElementById('startBtn').disabled = false;
+                        document.getElementById('stopBtn').disabled = true;
+                        document.getElementById('offlineMessage').style.display = 'block';
+                    }
+                } else {
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('stopBtn').disabled = true;
+                    document.getElementById('offlineMessage').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error checking camera status:', error);
+                document.getElementById('offlineMessage').style.display = 'block';
+            });
+    </script>
+</body>
+</html>

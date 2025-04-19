@@ -1,34 +1,21 @@
 -- Configuration tables
 
-CREATE TABLE IF NOT EXISTS config_sections (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT UNIQUE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS config_values (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    section_id INTEGER NOT NULL,
+CREATE TABLE IF NOT EXISTS config (
+    section TEXT NOT NULL,
     key TEXT NOT NULL,
     value TEXT,
-    value_type TEXT NOT NULL,  -- 'str', 'int', 'float', 'bool', 'json'
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (section_id) REFERENCES config_sections(id),
-    UNIQUE(section_id, key)
+    PRIMARY KEY (section, key)
 );
 
 CREATE TABLE IF NOT EXISTS cameras (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    camera_id TEXT UNIQUE NOT NULL,
+    id TEXT PRIMARY KEY,
     name TEXT,
     source TEXT NOT NULL,
     width INTEGER NOT NULL,
     height INTEGER NOT NULL,
     fps INTEGER NOT NULL,
     processing_fps INTEGER DEFAULT 15,
-    enabled BOOLEAN DEFAULT 1,
+    enabled INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -45,7 +32,7 @@ CREATE TABLE IF NOT EXISTS performance_metrics (
     queue_size INTEGER,
     faces_detected INTEGER,
     faces_recognized INTEGER,
-    FOREIGN KEY (camera_id) REFERENCES cameras(camera_id)
+    FOREIGN KEY (camera_id) REFERENCES cameras(id)
 );
 
 CREATE TABLE IF NOT EXISTS recognition_metrics (
@@ -57,7 +44,7 @@ CREATE TABLE IF NOT EXISTS recognition_metrics (
     detection_time FLOAT,
     recognition_time FLOAT,
     embedding_generation_time FLOAT,
-    FOREIGN KEY (camera_id) REFERENCES cameras(camera_id)
+    FOREIGN KEY (camera_id) REFERENCES cameras(id)
 );
 
 -- Recording Management

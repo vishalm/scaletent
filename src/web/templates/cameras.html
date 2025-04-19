@@ -171,50 +171,47 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const response = await fetch('/api/cameras');
             const data = await response.json();
-            
-            const cameraGrid = document.getElementById('camera-grid');
-            cameraGrid.innerHTML = ''; // Clear existing feeds
-            
-            // Add camera feeds
-            Object.entries(data.cameras || {}).forEach(([id, camera]) => {
-                const col = document.createElement('div');
-                col.className = 'col-lg-6 col-xl-4';
-                col.innerHTML = `
-                    <div class="card border-0 shadow-sm h-100">
-                        <div class="card-body p-0">
-                            <div class="camera-feed">
-                                <img src="/api/cameras/${id}/snapshot" alt="Camera ${id}"
-                                     onerror="this.src='/static/img/offline.png'">
-                                <div class="camera-status ${camera.running ? 'online' : 'offline'}">
-                                    ${camera.running ? 'Online' : 'Offline'}
-                                </div>
-                                <div class="camera-controls">
-                                    <div class="text-white">
-                                        <h6 class="mb-0">${camera.name || `Camera ${id}`}</h6>
-                                        <small class="opacity-75">${camera.width}x${camera.height} @ ${camera.fps}fps</small>
-                                    </div>
-                                    <div>
-                                        <button class="btn btn-sm btn-light me-2 camera-power-btn" 
-                                                data-camera-id="${id}" 
-                                                data-running="${camera.running}">
-                                            <i class="fas fa-power-off"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-light camera-settings-btn" 
-                                                data-camera-id="${id}">
-                                            <i class="fas fa-cog"></i>
-                                        </button>
-                                    </div>
-                                </div>
+            const cameras = data.cameras;
+            const grid = document.getElementById('camera-grid');
+            grid.innerHTML = '';
+
+            for (const [cameraId, camera] of Object.entries(cameras)) {
+                const card = document.createElement('div');
+                card.className = 'col-md-6 mb-4';
+                card.innerHTML = `
+                    <div class="card h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">${camera.name || cameraId}</h5>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-primary camera-power-btn" 
+                                        data-camera-id="${cameraId}" 
+                                        data-running="${camera.running}">
+                                    <i class="bi ${camera.running ? 'bi-stop-fill' : 'bi-play-fill'}"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary camera-settings-btn" 
+                                        data-camera-id="${cameraId}">
+                                    <i class="bi bi-gear-fill"></i>
+                                </button>
                             </div>
+                        </div>
+                        <div class="card-body text-center">
+                            <img src="/api/cameras/${cameraId}/snapshot" 
+                                 class="img-fluid rounded" 
+                                 alt="Camera Feed"
+                                 onerror="this.src='/static/img/offline.png'"
+                                 style="max-height: 300px;">
+                        </div>
+                        <div class="card-footer">
+                            <small class="text-muted">
+                                Resolution: ${camera.width}x${camera.height} @ ${camera.fps}fps
+                            </small>
                         </div>
                     </div>
                 `;
-                cameraGrid.appendChild(col);
-            });
-            
-            // Add event listeners to new buttons
+                grid.appendChild(card);
+            }
+
             setupCameraControls();
-            
         } catch (error) {
             console.error('Error updating camera grid:', error);
         }

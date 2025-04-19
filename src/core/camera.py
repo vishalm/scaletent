@@ -183,11 +183,21 @@ class Camera:
                 source = self.source
             
             logger.info(f"Opening camera {self.camera_id} with source: {source}")
-            self.capture = cv2.VideoCapture(source)
+            
+            # Try to open the camera multiple times
+            max_attempts = 3
+            for attempt in range(max_attempts):
+                self.capture = cv2.VideoCapture(source)
+                if self.capture.isOpened():
+                    break
+                logger.warning(f"Failed to open camera {self.camera_id} on attempt {attempt + 1}")
+                if self.capture is not None:
+                    self.capture.release()
+                time.sleep(1.0)
             
             # Check if opened successfully
             if not self.capture.isOpened():
-                logger.error(f"Failed to open camera {self.camera_id}")
+                logger.error(f"Failed to open camera {self.camera_id} after {max_attempts} attempts")
                 self.capture = None
                 return
             
@@ -210,6 +220,8 @@ class Camera:
         except Exception as e:
             logger.error(f"Error opening camera {self.camera_id}: {e}")
             self.last_error = str(e)
+            if self.capture is not None:
+                self.capture.release()
             self.capture = None
 
 
@@ -252,59 +264,74 @@ class CameraManager:
         
         self.is_running = True
         
-        # Configure cameras from config
-        camera_configs = self.config.get("cameras", [])
+        # Get camera configurations from database
+        camera_configs = self.config.get_cameras()
+        logger.info(f"Found {len(camera_configs)} camera configurations")
+        
         for camera_config in camera_configs:
             camera_id = camera_config.get("id")
-            source = camera_config.get("source")
-            
-            if not camera_id or not source:
-                logger.error("Camera config missing id or source")
+            if not camera_id:
+                logger.error("Camera config missing id")
                 continue
             
-            # Create camera instance
-            camera = Camera(
-                camera_id=camera_id,
-                source=source,
-                width=camera_config.get("width", 1280),
-                height=camera_config.get("height", 720),
-                fps=camera_config.get("fps", 30)
-            )
-            
-            # Add to cameras dict
-            self.cameras[camera_id] = camera
-            
-            # Start camera
-            camera.start()
-            
-            # Start processing task
-            task = asyncio.create_task(self._process_camera(camera_id))
-            self.processing_tasks[camera_id] = task
+            try:
+                # Create camera instance with all available settings
+                camera = Camera(
+                    camera_id=camera_id,
+                    source=camera_config.get("source", "0"),
+                    width=camera_config.get("width", 1280),
+                    height=camera_config.get("height", 720),
+                    fps=camera_config.get("fps", 30)
+                )
+                
+                # Add to cameras dict
+                self.cameras[camera_id] = camera
+                
+                # Start camera if enabled
+                if camera_config.get("enabled", True):
+                    logger.info(f"Starting camera {camera_id}")
+                    camera.start()
+                    # Start processing task
+                    task = asyncio.create_task(self._process_camera(camera_id))
+                    self.processing_tasks[camera_id] = task
+                    # Wait for camera to initialize
+                    await asyncio.sleep(1.0)
+                else:
+                    logger.info(f"Camera {camera_id} is disabled")
+                
+            except Exception as e:
+                logger.error(f"Error initializing camera {camera_id}: {e}")
+                continue
         
         logger.info(f"Started {len(self.cameras)} cameras")
     
     async def stop(self):
         """Stop all cameras and processing tasks"""
+        if not self.is_running:
+            return
+        
         self.is_running = False
-        
-        # Cancel all processing tasks
-        for camera_id, task in self.processing_tasks.items():
-            if not task.done():
-                task.cancel()
-        
-        # Wait for tasks to complete
-        if self.processing_tasks:
-            await asyncio.gather(*self.processing_tasks.values(), return_exceptions=True)
-        
-        self.processing_tasks = {}
         
         # Stop all cameras
         for camera_id, camera in self.cameras.items():
-            camera.stop()
+            try:
+                if camera.is_running:
+                    camera.stop()
+                    if camera_id in self.processing_tasks:
+                        task = self.processing_tasks[camera_id]
+                        if not task.done():
+                            task.cancel()
+                            try:
+                                await task
+                            except asyncio.CancelledError:
+                                pass
+            except Exception as e:
+                logger.error(f"Error stopping camera {camera_id}: {e}")
         
-        self.cameras = {}
+        # Clear processing tasks
+        self.processing_tasks.clear()
         
-        logger.info("Camera manager stopped")
+        logger.info("Stopped all cameras")
     
     async def _process_camera(self, camera_id):
         """
